@@ -35,3 +35,4 @@ C_m2 = lme(C.mg ~ fluctuation*sampling, random = ~0+sampling|MC, method = 'REML'
 C_m3 = lme(C.mg ~ fluctuation*sampling, random = ~sampling|MC, method = 'REML',control= lmeControl(niterEM =5000, msMaxIter =5000, msMaxEval =5000), data = data1)
 anova(C_m1, C_m2, C_m3)
 
+## residual validation
