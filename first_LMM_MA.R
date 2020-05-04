@@ -2,6 +2,7 @@
 
 # 1. load required packages
 library(lme4)
+library(nlme)
 library(tidyverse)
 
 #import your data
