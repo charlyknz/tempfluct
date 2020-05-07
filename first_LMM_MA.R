@@ -133,3 +133,44 @@ ggplot(data10, aes(x = sampling, y=c_umol_l, col = treatment, group = MC ))+
   #facet_wrap(~treatment)+
   theme_classic()
 #ggsave(plot = last_plot(), file = '1_LMM_MA.png')
+
+###########################################################################
+##### Explore Zooplankton Phytoplankton realtionship #####
+library(ggpubr)
+
+#import data
+zoo_data <- read.csv2('~/Desktop/MA/MA_Rcode/project_data/Zoo_all.csv')
+str(zoo_data)
+
+
+zoo <- zoo_data %>%
+  select(n_sampling, planktotron, fluct, chl_a,C_water_µmol_l, overall_abundance_l, dryweight_l ) %>%
+  rename(sampling = n_sampling, MC = planktotron, treatment = fluct, c_umol_l = C_water_µmol_l) %>%
+  mutate(fluctuation = ifelse(treatment == 'Con', 0, ifelse(treatment == 'F12', 12, ifelse(treatment == 'F24', 24,
+                                                                                           ifelse(treatment == 'F36', 36, ifelse(treatment == 'F48', 48,6 )))))) %>%
+  drop_na(overall_abundance_l)
+
+## correlation scatter
+ggscatter(zoo, x = "dryweight_l", y = "c_umol_l", 
+          add = "reg.line", conf.int = TRUE, 
+          cor.coef = TRUE, cor.method = "pearson", xlab = 'zooplankton biomass',
+          ylab = 'phytoplankton carbon content')
+  
+## per treatment 
+ggscatter(zoo, x = "overall_abundance_l", y = "c_umol_l", 
+          add = "reg.line", conf.int = TRUE, 
+          cor.coef = TRUE, cor.method = "pearson", xlab = 'zooplankton abundance',
+          color = "treatment", palette = "jco",           # Color by groups "cyl"
+          shape = "treatment", facet.by = 'treatment',
+          ylab = 'phytoplankton carbon content')+
+  stat_cor(aes(color = treatment), label.x = 3) 
+
+ggsave(plot = last_plot(), file = 'MA_correlation_plot.png')
+res <- cor.test(zoo$dryweight_l,zoo$c_umol_l, 
+                method = "pearson")
+res
+head(zoo)
+
+
+## see also http://www.sthda.com/english/articles/24-ggpubr-publication-ready-plots/78-perfect-scatter-plots-with-correlation-and-marginal-histograms/
+
