@@ -25,7 +25,7 @@ all_logistic_fits <- all_growthmodels(
   log = "y", ncores=1)
 #sets up the framing for the plot, and plots every individual growth curve with logistic fits
 
-par(mfrow = c(4, 3))
+par(mfrow = c(2, 3))
 par(mar=c(1,1,1,1))
 plot(all_logistic_fits)
 #dev.off()
