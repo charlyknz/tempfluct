@@ -131,6 +131,13 @@ data_ARF <- all_BV %>%
   summarise( mean_t10_0 = mean_V/t0_volume,
           se_t10_0 = se_V/t0_se) 
 
+#visualise mean divided by t0 values:
+ggplot(data_ARF, aes(x = fluctuation, y = mean_t10_0, col = id))+
+  geom_point()+
+  geom_errorbar(aes(ymin = mean_t10_0 - se_t10_0, ymax = mean_t10_0 + se_t10_0), width = .8)+
+  scale_x_continuous(limits = c(-1, 52), breaks = c(0,6,12,24,36,48))+
+  facet_wrap(~id, scales = 'free_y')+
+  theme_bw()
 
 # Schritt 3: subset of control data to later merge them as a new column with the other df
 data_con <- data_ARF %>%
@@ -152,6 +159,7 @@ ggplot(ARF, aes(x = fluctuation, y = ARF, col = id))+
   geom_point(size = 1.8, position=position_dodge(width=2))+
   geom_errorbar(aes(ymin = ARF - se_ARF, ymax = ARF + se_ARF), width = .8, position=position_dodge(width=2))+
   scale_x_continuous(limits = c(4, 52), breaks = c(6,12,24,36,48))+
+  geom_hline(yintercept = 0)+  
   facet_wrap(~id)+
   theme_bw()
-ggsave(plot = last_plot(), file = 'plot_facet_id.png' )
+#ggsave(plot = last_plot(), file = 'ARF_plot.png' )
