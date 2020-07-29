@@ -57,15 +57,15 @@ all_data <- left_join(rich, BioV, by = c('genus', 'species') ) %>%
 #new df to calculate mean biovolume
 calc_BV <- all_data%>%
   filter(sampling == 10) %>% #remove sampling 0 
-  group_by(treatment, fluctuation, sampling, id) %>%
+  group_by(treatment, fluctuation, sampling, id, genus, species) %>%
   summarise(mean_V = mean(volume, na.rm = T),
             sd_V = sd(volume, na.rm = T),
             se_V = sd_V/sqrt(n())) %>% #calculate mean cells with biovolume
-select(-sd_V)
+  select(-sd_V)
 #calculate mean Volume for sampling 0, assuming all treatments are the same at the beginning
 data0 <- all_data %>% 
   filter(sampling == 0) %>%
-  group_by( sampling, id) %>%
+  group_by( sampling, id, genus, species) %>%
   summarise(con = mean(volume, na.rm = T),
             F6 = mean(volume, na.rm = T),
             F12 = mean(volume, na.rm = T),
@@ -85,28 +85,17 @@ data0 <- all_data %>%
             se_F36= sd_F36/sqrt(n()),
             se_F48= sd_F48/sqrt(n()))%>%
   select(-sd_con,-sd_F6, -sd_F12, -sd_F24, -sd_F36, -sd_F48)%>%
-  gather(key = 'treatment', value = 'mean_V',  -sampling, -id, -se_con,-se_F6, -se_F12, -se_F24, -se_F36, -se_F48) %>%
-  gather(key = 'variable', value = 'se_V', -sampling, -id, -treatment,-mean_V) %>%
+  gather(key = 'treatment', value = 'mean_V',  -sampling, -id,-genus,-species, -se_con,-se_F6, -se_F12, -se_F24, -se_F36, -se_F48) %>%
+  gather(key = 'variable', value = 'se_V', -sampling, -id, -genus,-species,-treatment,-mean_V) %>%
   select(-variable) %>%
-  distinct(sampling, id, treatment, mean_V, se_V) %>%
+  distinct(sampling, id, genus, species, treatment, mean_V, se_V) %>%
   na.omit()
 
 ##merge zero-values and data-rest
 all_BV <- dplyr::bind_rows(calc_BV, data0) %>%
   drop_na(mean_V) #mean_V is the mean of two replicate MC
 
-##visualise per treatment over time:
-#all_BV %>%
-#  group_by(id, sampling, treatment) %>%
-#  summarise(sum = sum(mean_V), 
-#            sd = sd(mean_V, na.rm = T),
- #           se = sd/sqrt(n())) #%>%
-  ggplot(all_BV, aes(x = sampling, y = mean_V, col = treatment))+
-  geom_jitter(width = 0.25,size = 2)+
-  geom_errorbar(aes(ymin = mean_V - se_V, ymax = mean_V + se_V))+
-  scale_x_continuous(limits = c(-1, 19), breaks = c(0,6,10,14,18))+
-  facet_wrap(~id, scales = 'free_y')+
-  theme_bw()
+
 
 #### calculate Algal Response Factor ###
 
@@ -126,18 +115,19 @@ data_ARF <- all_BV %>%
   filter(sampling ==10) %>%
   ungroup()%>%
   select(-sampling) %>%
-  left_join(., ARF0, by = c('treatment', 'id')) %>%
-  group_by(id, treatment, fluctuation) %>%
+  left_join(., ARF0, by = c('treatment', 'id', 'genus', 'species')) %>%
+  group_by(id, genus, species, treatment, fluctuation) %>%
   summarise( mean_t10_0 = mean_V/t0_volume,
-          se_t10_0 = se_V/t0_se) 
+             se_t10_0 = se_V/t0_se)  %>%
+  mutate(species_id = paste(genus, species, sep = ' '))
 
 #visualise mean divided by t0 values:
-#ggplot(data_ARF, aes(x = fluctuation, y = mean_t10_0, col = id))+
-#  geom_point()+
-#  geom_errorbar(aes(ymin = mean_t10_0 - se_t10_0, ymax = mean_t10_0 + se_t10_0), width = .8)+
- # scale_x_continuous(limits = c(-1, 52), breaks = c(0,6,12,24,36,48))+
-  #facet_wrap(~id, scales = 'free_y')+
-  #theme_bw()
+ggplot(data_ARF, aes(x = fluctuation, y = mean_t10_0, col = treatment))+
+  geom_point()+
+  geom_errorbar(aes(ymin = mean_t10_0 - se_t10_0, ymax = mean_t10_0 + se_t10_0), width = .8)+
+  scale_x_continuous(limits = c(-1, 52), breaks = c(0,6,12,24,36,48))+
+  facet_wrap(~species_id, scales = 'free_y')+
+  theme_bw()
 
 # Schritt 3: subset of control data to later merge them as a new column with the other df
 data_con <- data_ARF %>%
@@ -149,28 +139,41 @@ data_con <- data_ARF %>%
 
 ## Schritt 4. Merge all data together, we have now two columns of values (both divdided by t0):
 # Treatment and control (divdided by t0 respectively), those will be divided now for ARF
-ARF <- left_join(data_ARF, data_con, by = c('id')) %>%
+ARF <- left_join(data_ARF, data_con, by = c('id', 'species_id','genus', 'species')) %>%
   filter(treatment != 'con') %>%
   mutate(ARF = mean_t10_0/con_div0,
-         se_ARF = se_t10_0/se_div0)
+         se_ARF = se_t10_0/se_div0) %>%
+  filter(!genus %in% c('Alexandrium', 'Pinnularia', 'Peridiniella', 'Odontella') )
 
 #Visulasitation
-ggplot(subset(ARF,id != 'Ciliophora'), aes(x = fluctuation, y = ARF, shape = id, col = id))+
+library(viridis)
+ggplot(subset(ARF, id == 'Ciliophora'), aes(x = fluctuation, y = ARF, col = fluctuation))+
+  geom_point(size = 1.8)+
+  geom_errorbar(aes(ymin = ARF - se_ARF, ymax = ARF + se_ARF), width = .8)+
+  scale_x_continuous(limits = c(4, 52), breaks = c(6,12,24,36,48))+
+  geom_hline(yintercept = 0)+ 
+  facet_wrap(~species_id, scales = 'free_y')+
+  scale_color_viridis(option = "D", direction = -1)+
+theme_bw()
+#ggsave(plot = last_plot(), file = 'ARF_plot_Ciliophora.png' )
+
+####  together ####
+ggplot(subset(ARF, id != 'Ciliophora'), aes(x = fluctuation, y = ARF, col = fluctuation))+
   geom_point(size = 2.5, position = position_dodge(width = 3))+
   geom_errorbar(aes(ymin = ARF - se_ARF, ymax = ARF + se_ARF), width = .8,position = position_dodge(width = 3))+
   scale_x_continuous(limits = c(4, 52), breaks = c(6,12,24,36,48))+
   geom_hline(yintercept = 0)+ 
-  scale_shape_manual(values = c(1, 15,6,17))+
-  scale_color_manual(values = c("#999999", "#D55E00", "#0072B2","#009E73"))+
-  labs( x = 'Fluctuation frequency (in h)', col = 'Phylum', shape = 'Phylum')+
+  #scale_shape_manual(values = c(1, 15,6,17))+
+  facet_wrap(~species_id, scales = 'free_y', ncol = 3)+
+  scale_color_viridis(option = "D", direction = -1, discrete = F)+
+  labs( x = 'Fluctuation frequency (in h)', col = 'treatment', title = 'species specific ARF')+
   theme( panel.background = element_rect(fill = NA), #loescht den Hintergrund meines Plots/ fuellt ihn mit nichts
          #panel.grid.major.y = element_line(color='grey', linetype = 'dashed', size=0.2),
          panel.border= element_rect(colour = "black", fill=NA, size=0.5),
          strip.background = element_rect(color ='black', fill = 'white'),
+         strip.text = element_text(face = 'italic'),
          legend.background = element_blank(),
          legend.position  ='bottom',
          legend.key = element_blank(),
-         text = element_text(size=12))
-#ggsave(plot = last_plot(), file = 'ARF_plot_sum.png' )
-
-
+         text = element_text(size=10))
+ggsave(plot = last_plot(), file = 'ARF_allspec.png', width = 10, height = 10 )
