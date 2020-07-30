@@ -158,15 +158,16 @@ theme_bw()
 #ggsave(plot = last_plot(), file = 'ARF_plot_Ciliophora.png' )
 
 ####  together ####
-ggplot(subset(ARF, id != 'Ciliophora'), aes(x = fluctuation, y = ARF, col = fluctuation))+
-  geom_point(size = 2.5, position = position_dodge(width = 3))+
+ggplot(subset(ARF, id != 'Ciliophora'), aes(x = fluctuation, y = ARF))+
+  geom_point(aes(fill = as.factor(fluctuation)), pch=21, size=4, col = 'black',position = position_dodge(width = 3))+
   geom_errorbar(aes(ymin = ARF - se_ARF, ymax = ARF + se_ARF), width = .8,position = position_dodge(width = 3))+
   scale_x_continuous(limits = c(4, 52), breaks = c(6,12,24,36,48))+
   geom_hline(yintercept = 0)+ 
   #scale_shape_manual(values = c(1, 15,6,17))+
-  facet_wrap(~species_id, scales = 'free_y', ncol = 3)+
-  scale_color_viridis(option = "D", direction = -1, discrete = F)+
-  labs( x = 'Fluctuation frequency (in h)', col = 'treatment', title = 'species specific ARF')+
+  facet_wrap(~species_id, scales = 'free_y', ncol = 5)+
+  #scale_color_viridis(option = "D", direction = -1, discrete = F)+
+  scale_fill_manual(values = c( '#fed976','#addd8e','#31a354','#41b6c4','#0868ac'))+
+  labs( x = 'Fluctuation frequency (in h)', col = 'treatment', title = 'species specific ARF at sampling 10', fill = 'Fluctuation frequency')+
   theme( panel.background = element_rect(fill = NA), #loescht den Hintergrund meines Plots/ fuellt ihn mit nichts
          #panel.grid.major.y = element_line(color='grey', linetype = 'dashed', size=0.2),
          panel.border= element_rect(colour = "black", fill=NA, size=0.5),
@@ -175,5 +176,5 @@ ggplot(subset(ARF, id != 'Ciliophora'), aes(x = fluctuation, y = ARF, col = fluc
          legend.background = element_blank(),
          legend.position  ='bottom',
          legend.key = element_blank(),
-         text = element_text(size=10))
-ggsave(plot = last_plot(), file = 'ARF_allspec.png', width = 10, height = 10 )
+         text = element_text(size=14))
+#ggsave(plot = last_plot(), file = 'ARF_allspec.png', width = 11, height = 7 )

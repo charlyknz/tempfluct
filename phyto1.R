@@ -35,8 +35,21 @@ treatments <- read.csv2('~/Desktop/MA/MA_Rcode/project_data/treatments_units.csv
 str(treatments)
 names(treatments) = c('MC', 'fluctuation', 'treatment')
 rich <- left_join(data, treatments, by = c('MC')) %>%
-  separate(species, into = c('genus', 'species'), ' ') 
+  separate(species, into = c('genus', 'species'), ' ')
 
+spec <- rich %>%
+  mutate(species_id = paste(genus, species, sep = ' '))  %>%
+  group_by(treatment, sampling, species_id) %>%
+  summarise(mean_cells = mean(cells_ml, na.rm = T), 
+            sd = sd(cells_ml, na.rm = T),
+            se = sd/sqrt(n())) %>%
+  ggplot(., aes(x = treatment, y = mean_cells, fill = species_id))+
+  geom_col()+
+  facet_wrap(~sampling)+
+  theme_bw()
+spec
+  
+  
 shannon <- rich %>%
   select(-species)  %>%
   group_by(treatment, sampling, genus) %>%
@@ -61,11 +74,19 @@ shannon$no = apply(absence_presence, MARGIN = 1, FUN = sum) #new column containi
 
 #write.csv2(x = shannon, file = 'diversity_indices.csv')
 
+data_index <- shannon %>%
+  select(-c(4:23)) %>%
+  filter(sampling == 10)
+#write.csv2(x = data_index, file = 'richness_s10.csv')
+shannon$fluctuation <- factor(as.factor(shannon$fluctuation),levels=c("0", "48", "36", '24', '12', '6'))
+
 #plot for species richness or shannon
-ggplot(subset(shannon, sampling == 10), aes(x = fluctuation, y = no, fill = fluctuation)) +
-  geom_col()+
-  scale_x_continuous(limits = c(-4, 52), breaks = c(0,6,12,24,36,48))+
-  scale_color_viridis(option = "D", direction = -1, discrete = F)+
+ggplot(subset(shannon, sampling == 10), aes(x = fluctuation, y = no)) +
+  geom_col(aes(fill = fluctuation), col = '#000000')+
+  scale_y_continuous(limits = c(-1, 20), breaks = seq(0,18,3))+
+  scale_fill_manual(values = c( '#000000','#0868ac','#41b6c4','#31a354','#addd8e','#fed976'))+
+  labs(x = 'Fluctuation frequency (in h)', y = 'species richness', fill = 'Fluctuation')+
+  geom_hline(yintercept = 16, linetype = 'dashed', size = 0.5)+
   theme( panel.background = element_rect(fill = NA), #loescht den Hintergrund meines Plots/ fuellt ihn mit nichts
          #panel.grid.major.y = element_line(color='grey', linetype = 'dashed', size=0.2),
          panel.border= element_rect(colour = "black", fill=NA, size=0.5),
@@ -74,8 +95,8 @@ ggplot(subset(shannon, sampling == 10), aes(x = fluctuation, y = no, fill = fluc
          legend.background = element_blank(),
          legend.position  ='bottom',
          legend.key = element_blank(),
-         text = element_text(size=10))
-
+         text = element_text(size=12))
+#ggsave(plot = last_plot(), file = 'richness.png')
 ########################################################################################
 #### Biovolume ####
 algal_measurement <- read_delim("~/Desktop/MA/MA_Rcode/project_data/algal_measurement.csv", 
@@ -94,23 +115,35 @@ BioV <- algal_measurement %>%
 #### merge all_data ####
 all_data <- left_join(rich, BioV, by = c('genus', 'species') ) %>%
  select(treatment, fluctuation, MC, sampling, genus, species, id, cells_ml,mean_BioV) %>%
- mutate(volume = cells_ml*mean_BioV)  #calculate biovolume
+ mutate(volume = cells_ml*mean_BioV) #calculate biovolume
 
 #new df to calculate mean biovolume
 rel_BV <- all_data%>%
-  filter(sampling != 0)%>%
-  group_by(treatment, fluctuation, sampling)%>%
-  mutate(sum = sum(volume, na.rm = T)) %>%
-  group_by(treatment, sampling, fluctuation, id) %>%
-    mutate(mean_V = mean(volume, na.rm = T),
-              sd_V = sd(volume, na.rm = T),
-              se_V = sd_V/sqrt(n()),
-              rel_V = (mean_V/sum)*100 ) %>% #calculate mean cells with biovolume
+  #filter(sampling ==6)%>%
   mutate(species_id = paste(genus, species, sep = '_'))%>%
-  filter(rel_V > 2)
-ggplot(rel_BV, aes( x = treatment, y = rel_V, fill = id))+
-  geom_col()+
-  scale_y_continuous(limits = c(0,100), breaks = seq(0,100, 20))+
-  facet_wrap(~sampling)
-#ggsave(plot=last_plot(), file = 'rel_V_perspecies.png')
+  group_by(treatment, fluctuation, sampling, MC)%>%
+  mutate(sum = sum(volume, na.rm = T),
+         rel_V = volume/sum) %>%
+  group_by(treatment, sampling, fluctuation, species_id) %>%
+  summarise(mean_contr = mean(rel_V, na.rm = T),
+            rel_contr = mean_contr*100 ) %>% #calculate mean cells with biovolume
+    filter(mean_contr >0.01)
+
+rel_BV$fluctuation <- factor(as.factor(rel_BV$fluctuation),levels=c("0", "48", "36", '24', '12', '6'))
+
+ggplot(rel_BV, aes( x = fluctuation, y = mean_contr))+
+  geom_col(aes(fill = species_id), col = 'black')+
+  #scale_y_continuous(limits = c(0,100), breaks = seq(0,100, 20))+
+  facet_wrap(~sampling)+
+  labs(x = 'Fluctuation frequency (in H)', y = 'mean contribution of species to BioV', fill = 'species')+
+  theme( panel.background = element_rect(fill = NA), #loescht den Hintergrund meines Plots/ fuellt ihn mit nichts
+         #panel.grid.major.y = element_line(color='grey', linetype = 'dashed', size=0.2),
+         panel.border= element_rect(colour = "black", fill=NA, size=0.5),
+         strip.background = element_rect(color ='black', fill = 'white'),
+         strip.text = element_text(face = 'bold'),
+         legend.background = element_blank(),
+         legend.position  ='bottom',
+         legend.key = element_blank(),
+         text = element_text(size=10))
+#ggsave(plot=last_plot(), file = 'rel_V_perspecies.png', width = 11, height = 8)
   
