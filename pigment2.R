@@ -2,36 +2,13 @@
 # R Skript to analyse pigment composition
 library(tidyverse)
 ## load data
-#all_pigments <- read.csv2("~/Desktop/MA/MA_Rcode/project_data/all_pigments.csv", 
- #                         sep = ";", dec = ',')
-
-#View(all_pigments)
-#df <- data.frame( planktotron = c('1', '4', '2', '10', '3', '5', '6', '7', '8', '9', '11', '12'),
- #                 treatment = c('control', 'control', 'Fluctuating_36','Fluctuating_36',
-  #                              'Fluctuating_6', 'Fluctuating_6', 'Fluctuating_48', 'Fluctuating_48',
-   #                             'Fluctuating_24', 'Fluctuating_24', 'Fluctuating_12','Fluctuating_12') )
-
-#pigi <- all_pigments %>%
- # filter(planktotron != 'Blank') %>%
-#  select(-X) 
-#data <- left_join(pigi, df, by = c('planktotron'))
-
-#master_data <- data %>%
- # group_by(treatment,sampling) %>%
-  ##  mutate(sum = sum(value)) %>%
-  #spread(key = 'pigments', value = 'value') %>%
-  #arrange(sampling, planktotron) %>%
-  #mutate(planktotron = as.numeric(planktotron))%>%
-  #left_join(jacuzzi_no, by = c('planktotron', 'sampling')) %>%
-  #select(no, planktotron, sampling, date, everything())
-#write.csv2(x = master_data, file = 'master_pigments.csv')
 
 ##import master data
 data <- read.csv2("~/Desktop/MA/MA_Rcode/project_data/master_pigments.csv", sep = ";", dec = ',')
 
 pig_data <- data %>%
   gather(key = 'pigments',value = 'value',-X, -no, -date,-treatment, -sampling, -planktotron )%>%
-  group_by(treatment,sampling)%>%
+  group_by(treatment,sampling, planktotron)%>%
   mutate(sum = sum(value)) %>%
   ungroup()%>%
   spread(pigments, value ) %>%
@@ -49,14 +26,18 @@ pig_data <- data %>%
   mutate(rel_viola = Viola/sum) %>%
   select(-c("X","Allo", "Anth","bb.Car", "c.Neo", "Cantha","Chl.a","Chl.c1",
            "Chl.c2","Cryp","Diadino", "Diato","Dino","Echin","Lut","Myxo","Peri",       
-           "Phe.a","Phe.b", "Viola", "Zea" )) %>%
+           "Phe.a","Phe.b", "Viola", "Zea" , 'Fuco', 'Chl.b')) %>%
   gather(key = 'pigment', value = 'value', -planktotron, - sampling, -treatment,-sum, -no, -date) %>%
   group_by(treatment, sampling, pigment) %>% 
-  mutate(mean = mean(value, na.rm = T))
+  summarise(mean = mean(value, na.rm = T))%>%
+  mutate(fluctuation = paste(ifelse(treatment == 'control', 0, ifelse(treatment == 'Fluctuating_48', 48, ifelse(treatment == 'Fluctuating_36', 36,
+                                                                                                                ifelse(treatment == 'Fluctuating_24', 24, ifelse(treatment == 'Fluctuating_12', 12, 6)))))))
+pig_data$fluctuation <- factor(as.factor(pig_data$fluctuation),levels=c("0", "48", "36", '24', '12', '6'))
+
   
 
 pig_data %>%
-  filter(pigment %in% c('Fuco', 'Chl.b')) %>%
+  filter(pigment %in% c('rel_fuco', 'rel_chl.b')) %>%
 ggplot(., aes(x = sampling, y = mean, col = treatment, group = planktotron))+
   geom_point()+
   geom_line()+
@@ -75,10 +56,54 @@ pig_data%>%
 
 pig_data%>%
   filter(sampling %in% c(0,6,10,14,18))%>%
-  ggplot(aes(x = treatment, y = value, fill = pigment))+
-  geom_bar(stat = 'identity')+
-  labs(x = 'sampling', y = 'relative_contribution')+
+  ggplot(aes(x = fluctuation, y = mean, fill = pigment))+
+  geom_col(col = 'black')+
+  labs(x = 'sampling', y = 'relative_contribution of pigment abundance')+
   facet_wrap(~sampling)+
-  theme_bw()
-#ggsave(plot = last_plot(), file = 'pigments.png')
-#
+  theme_bw()+
+  theme(legend.position = 'bottom')
+#ggsave(plot = last_plot(), file = 'rel_pigments.png')
+
+#################################################################
+
+
+### calculate  diversity indices of pigment composition
+data_diversity <- data
+
+#remove NAs and exchange with 0
+data_diversity[is.na(data_diversity)] <- 0
+
+##calculate shannon diversity index
+data_diversity$shannon = diversity(data_diversity[, -c(1:6)], MARGIN = 1, index='shannon') #new column containing the calculated shannon index
+data_diversity <- select(data_diversity, X, no, planktotron, sampling,date, treatment, shannon, everything())
+## calculate species richness
+
+ab_presence <- decostand(data_diversity[, -c(1:7)], method= 'pa', na.rm=T) #df giving absence/presence data using decostand function
+data_diversity$rich = apply(ab_presence, MARGIN = 1, FUN = sum) #new column containing the sum of species present per side (by row = MARGIN = 1)
+
+data_diversity$evenness = data_diversity$shannon/log(data_diversity$rich)
+
+#data wrangling
+data_plot  <- data_diversity %>%
+  select(sampling, treatment,planktotron,shannon, evenness, rich) %>%
+  gather(key = 'index', value = 'value', -treatment, -sampling, -planktotron) %>%
+  group_by(sampling, treatment, index) %>%
+  summarise(mean_index = mean(value, na.rm = T),
+            sd_index = sd(value, na.rm = T),
+            se_index = sd_index/sqrt(n())) %>%
+  separate(treatment, into = c('mist', 'fluctuation'), '_')
+data_plot$fluctuation[is.na(data_plot$fluctuation)] <- 0
+
+#plot
+data_plot$fluctuation <- factor(as.factor(data_plot$fluctuation),levels=c("0", "48", "36", '24', '12', '6'))
+
+ggplot(data_plot, aes(x =sampling, y = mean_index))+
+  #geom_line(linetype = 'dashed', size = 0.5)+
+  geom_point(aes(fill = fluctuation), pch=21, size=3, col = '#000000')+
+  geom_errorbar(aes(ymin = mean_index - se_index, ymax = mean_index+se_index), width = .5)+
+  scale_fill_manual(values = c( '#000000', '#addd8e','#31a354','#41b6c4','#0868ac','#fed976'))+
+  facet_wrap(~index, scales ='free_y', ncol = 3)+
+  ylab(label = 'mean index of pigment diversity')+
+  theme_classic()
+ggsave(plot = last_plot(), file = 'pigment_diversity_overtime.png')
+

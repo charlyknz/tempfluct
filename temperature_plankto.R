@@ -5,10 +5,11 @@ library(readxl)
 library(lubridate)
 library(hms)
 
+#----------------------------------------------------------------------------------------------------------------#
+
 #sets working directory where your R script is saved in
 setwd("~/Desktop/MA/MA_data/abiotics/temperature_pH/Data")
 
-#----------------------------------------------------------------------------------------------------------------#
 ## import excel files using a Loop
 
 file.list <- list.files(pattern='*.xls')
@@ -17,17 +18,21 @@ df <- bind_rows(df.list, .id = "id")
 str(df)
 #write.csv(x = df, file = 'all_temperatures.csv')
 #df$actual_temptop <- as.numeric(gsub(",", ".", df$actual_temptop))
-
+## ------------------------------------------------------------------------------ ##
+## ------------------------------------------------------------------------------ ##
+all_temperatures <- read_csv("~/Desktop/MA/MA_Rcode/project_data/all_temperatures.csv", 
+                             locale = locale())
+View(all_temperatures)
 ## data wrangling
 
-temp <- df %>%
+temp <- all_temperatures %>%
   filter(timestamp >= '2019-08-27 08:00:00') %>%
   select(unit, timestamp, contains('actual')) %>%
   mutate(datetime = timestamp) %>%
   separate(timestamp, into = c('date', 'time'), sep = ' ') %>%
   mutate(time1 = as.character(time)) %>%
   filter(stringr::str_detect(time1, c(':00:1', ':30:1', ':15:1'))) %>% #keepsonly entries with 00:1 or 30:1 minute/seconds
-  filter(date > "2019-08-26", date < "2019-09-04") %>% #datetime between two dates
+  filter(date > "2019-08-26", date < "2019-10-02") %>% #datetime between two dates
   filter(unit %in% c(1,2,5,6,8,11)) #keep only one replicate
   
 
@@ -37,14 +42,15 @@ label_temp <- c('1' = 'constant', '2' = 'fluctuating 36 h', '5' = 'fluctuating 6
 plot <- ggplot(temp, aes(x = datetime, y = actual_tempmiddle))+
   #geom_hline(aes(yintercept = 18), col = 'darkgrey', linetype = 'dashed', size = 0.5)+
   geom_line(size = 1.2)+
-  facet_wrap(~unit, labeller = labeller(unit = label_temp))+
+  facet_wrap(~unit, labeller = labeller(unit = label_temp), ncol = 1)+
   labs( x = 'date', y = 'temperature (in °C)')+
   scale_y_continuous(limits = c(14, 22), breaks = c(15,18,21))+
+  scale_x_datetime(breaks = '4 days')+
   theme_classic()+
-  theme(text= element_text(size = 20),
+  theme(text= element_text(size = 12),
         strip.text = element_text(face = 'bold'))
 plot
-#ggsave(plot = plot, file = 'temp_curves_1wk.png', width = 20, height = 10)
+#ggsave(plot = plot, file = 'temp_curves.png', width = 20, height = 10)
 ## ------------------------------------------------------------------------------ ##
 ## ------------------------------------------------------------------------------ ##
 

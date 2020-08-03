@@ -30,44 +30,51 @@ df <- data.frame( sample = c('P1', 'P4', 'P2', 'P10', 'P3', 'P5', 'P6', 'P7', 'P
 nut <- left_join(data, df, by = 'sample') %>%
   drop_na(treatment) %>%
   gather(key = 'nutrient', value = 'value', - sample,-day,-treatment) %>%
-  filter(nutrient %in% c('nitrate_nitrit', 'phosphate', 'silicate'))
+  filter(nutrient %in% c('nitrate_nitrit', 'phosphate', 'silicate')) %>%
+  group_by(treatment, day, nutrient) %>%
+  summarise(mean = mean(value, na.rm = T),
+            sd = sd(value, na.rm =T),
+            se = sd/sqrt(n()))
 
-nut %>%
-  filter(nutrient %in% c('phosphate', 'nitrate_nitrit'))%>%
-ggplot(., aes(x = day, y = value, col = nutrient, group = nutrient))+
+ggplot(subset(nut, nutrient %in% c('phosphate', 'nitrate_nitrit')), aes(x = day, y = mean, col = nutrient, group = nutrient))+
   geom_point()+
-  geom_smooth()+
+  geom_line()+
   facet_grid(~treatment, scales = 'free')+
   theme_bw()
 #ggsave(plot = last_plot(), file = 'nitrate_nitrite_phosphate.png')  
 
-nut %>%
-  filter(nutrient == 'silicate')%>%
-  ggplot(., aes(x = day, y = value, group = treatment))+
-  geom_point()+
-  geom_smooth()+
-  facet_grid(~treatment, scales = 'free')+
+nut$treatment = factor(as.factor(nut$treatment), levels = c('control', 'Fluctuating_48', 'Fluctuating_36', 'Fluctuating_24', 'Fluctuating_12', 'Fluctuating_6'))
+
+ggplot(nut, aes(x = day, y = mean, group = treatment, col = treatment))+
+  geom_line(linetype = 'dashed')+
+  geom_point(position = position_dodge(width = 0.5))+
+  #scale_x_continuous(limits = c(0,18), breaks = seq(0,18,2))+
+  scale_color_manual(values = c( '#000000','#0868ac','#41b6c4','#31a354','#addd8e','#fed976'))+
+  facet_wrap(~nutrient,scales = 'free_y')+
   theme_bw()
-#ggsave(plot = last_plot(), file = 'silicate.png') 
+#ggsave(plot = last_plot(), file = 'nutrients.png') 
 
 
 ###########################################################################################
 
 cnp_data <- read.csv2('~/Desktop/MA/MA_Rcode/project_data/cnp_data_treatments.csv')
 str(cnp_data)
-cnp_data <- cnp_data %>%
+c_data <- cnp_data %>%
   ungroup()%>%
   mutate(sampling = str_remove(sample, 'S'),
          sampling = as.numeric(sampling)) %>%
   group_by(treatment, sampling) %>%
   summarise(mean = mean(c_umol_l, na.rm = T),
          sd = sd(c_umol_l, na.rm = T),
-         se = sd/sqrt(n()))
+         se = sd/sqrt(n())) %>%
+  mutate(fluctuation = paste(ifelse(treatment == 'control', 0, ifelse(treatment == 'Fluctuating_48', 48, ifelse(treatment == 'Fluctuating_36', 36,
+                                                                      ifelse(treatment == 'Fluctuating_24', 24, ifelse(treatment == 'Fluctuating_12', 12, 6)))))))
+c_data$fluctuation <- factor(as.factor(c_data$fluctuation),levels=c("0", "48", "36", '24', '12', '6'))
 
-ggplot(cnp_data, aes(x = sampling, y = mean,group = treatment))+
+ggplot(c_data, aes(x = sampling, y = mean,group = treatment))+
   geom_line(linetype = 'dashed', aes(color = treatment))+
-  geom_point(aes(fill=treatment), colour="black",pch=21, size=3, position = position_dodge(width = 1))+
-  geom_errorbar(aes(ymin = mean - se, ymax = mean + se), width = .5, size = .4, position = position_dodge(width = 1))+
+  geom_point(aes(fill=treatment), colour="black",pch=21, size=3, position = position_dodge(width = .8))+
+  geom_errorbar(aes(ymin = mean - se, ymax = mean + se), width = .2, size = .4, position = position_dodge(width =.8))+
   scale_fill_manual(values = c( '#000000', '#addd8e','#31a354','#41b6c4','#0868ac','#fed976'))+
   scale_color_manual(values = c( '#000000', '#addd8e','#31a354','#41b6c4','#0868ac','#fed976'))+
   labs(x = 'sampling', y = expression(carbon~mu*mol*~L^-1))+
