@@ -76,16 +76,18 @@ data_diversity[is.na(data_diversity)] <- 0
 ##calculate shannon diversity index
 data_diversity$shannon = diversity(data_diversity[, -c(1:6)], MARGIN = 1, index='shannon') #new column containing the calculated shannon index
 data_diversity <- select(data_diversity, X, no, planktotron, sampling,date, treatment, shannon, everything())
+data_diversity$simpson = diversity(data_diversity[, -c(1:7)], MARGIN = 1, index= 'invsimpson') #new column containing the calculated shannon index
+data_diversity <- select(data_diversity, X, no, planktotron, sampling,date, treatment, shannon, simpson, everything())
 ## calculate species richness
 
-ab_presence <- decostand(data_diversity[, -c(1:7)], method= 'pa', na.rm=T) #df giving absence/presence data using decostand function
+ab_presence <- decostand(data_diversity[, -c(1:8)], method= 'pa', na.rm=T) #df giving absence/presence data using decostand function
 data_diversity$rich = apply(ab_presence, MARGIN = 1, FUN = sum) #new column containing the sum of species present per side (by row = MARGIN = 1)
 
 data_diversity$evenness = data_diversity$shannon/log(data_diversity$rich)
 
 #data wrangling
 data_plot  <- data_diversity %>%
-  select(sampling, treatment,planktotron,shannon, evenness, rich) %>%
+  select(sampling, treatment,planktotron,shannon, evenness, rich, simpson) %>%
   gather(key = 'index', value = 'value', -treatment, -sampling, -planktotron) %>%
   group_by(sampling, treatment, index) %>%
   summarise(mean_index = mean(value, na.rm = T),
@@ -97,13 +99,22 @@ data_plot$fluctuation[is.na(data_plot$fluctuation)] <- 0
 #plot
 data_plot$fluctuation <- factor(as.factor(data_plot$fluctuation),levels=c("0", "48", "36", '24', '12', '6'))
 
-ggplot(data_plot, aes(x =sampling, y = mean_index))+
+ggplot(subset(data_plot, sampling == 10 & index %in% c('evenness', 'shannon')), aes(x =fluctuation, y = mean_index))+
   #geom_line(linetype = 'dashed', size = 0.5)+
-  geom_point(aes(fill = fluctuation), pch=21, size=3, col = '#000000')+
+  geom_point(aes(fill = fluctuation), pch=21, size=4, col = '#000000')+
   geom_errorbar(aes(ymin = mean_index - se_index, ymax = mean_index+se_index), width = .5)+
-  scale_fill_manual(values = c( '#000000', '#addd8e','#31a354','#41b6c4','#0868ac','#fed976'))+
-  facet_wrap(~index, scales ='free_y', ncol = 3)+
+  scale_fill_manual(values = c( '#000000','#0868ac','#41b6c4','#31a354','#addd8e','#fed976'))+
+  facet_wrap(~index, scales ='free_y', ncol = 1)+
   ylab(label = 'mean index of pigment diversity')+
-  theme_classic()
-ggsave(plot = last_plot(), file = 'pigment_diversity_overtime.png')
+  theme_classic()+
+  theme(legend.position = 'bottom', 
+        panel.background = element_rect(fill = NA), #loescht den Hintergrund meines Plots/ fuellt ihn mit nichts
+        #panel.grid.major.y = element_line(color='grey', linetype = 'dashed', size=0.2),
+        panel.border= element_rect(colour = "black", fill=NA, size=0.5),
+        strip.background = element_rect(color ='black', fill = 'white'),
+        strip.text = element_text(face = 'italic'),
+        legend.background = element_blank(),
+        legend.key = element_blank(),
+        text = element_text(size=14))#
+#ggsave(plot = last_plot(), file = 'pigment_even_shan_s10.png', width = 4, height = 9)
 

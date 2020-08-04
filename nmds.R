@@ -18,15 +18,30 @@ library(lubridate)
 library(scales)
 library(vegan)
 
-#import data using the manual import function (readr) and after that copying the console output
-tidy_counts <- read_delim("~/Desktop/MA/Data/cell_counts_sampling3.csv", 
-                          ";", escape_double = FALSE, col_types = cols(date = col_date(format = "%d.%m.%Y")), 
-                           trim_ws = TRUE)
+####import data####
+#using the manual import function (readr) and after that copying the console output
+phyto_new <- read_delim("~/Desktop/MA/MA_Rcode/project_data/phyto_new.csv", 
+                        ";", escape_double = FALSE, locale = locale(decimal_mark = ","), 
+                        trim_ws = TRUE)
+phyto_new$cells_ml <- as.numeric(gsub(",", ".", phyto_new$cells_ml))
+
+####a data frame#### 
+#with treatment information, which has the same column planktotron_no as in data.scores
+df=data.frame(treat=c('0','36','6','0','6','48','48',
+                      '24','24','36','12','12'),  
+              MC = c(1:12) )
+
+#combine the two df
 
 # new data frame including data wrangling
-data_nd <- tidy_counts %>%
-  select(planktotron_no, species, sampling, date, cells_ml) %>%            #select columns we want to keep
-  distinct(planktotron_no, species, sampling, date, cells_ml) %>%          #keep only distinct combinations of given columns
+data_nd <- phyto_new %>%
+  #rename(MC = planktotron) %>%
+  select(MC, species, sampling, cells_ml) %>% 
+  na.omit() %>% #select columns we want to keep
+  filter(MC != 'Blank') %>%
+  full_join(df, df, by = c('MC')) %>%
+ # group_by(sampling, treat, species) %>%
+  #summarise(mean_cells = mean(cells_ml, na.rm = T)) %>%
   spread(key = 'species', value = 'cells_ml',  fill = NA, convert=F)       #convert the column 'species' to many columns, for each species one. Fill these columns with the cells per ml for that species
 
 #fill all N.A.s with 0
@@ -47,30 +62,37 @@ data.scores = as.data.frame(scores(nmds)) #obtain the coordinates for the axes a
 
 #add columns with further information
 data.scores$sampling = data_nd$sampling
-data.scores$date = data_nd$date
-data.scores$planktotron_no = data_nd$planktotron_no
+#data.scores$date = data_nd$date
+data.scores$treat = data_nd$treat
 
-#write a data frame with treatment information, which has the same column planktotron_no as in data.scores
-df=data.frame(treat=c('constant','fluct 36','fluct 6','constant','fluct 6','fluct 48','fluct 48',
-                      'fluct 24','fluct 24','fluct 36','fluct 12','fluct 12'),  
-              planktotron_no = c(1:12) )
-
-#combine the two df
-data.scores <- full_join(data.scores, df, by = c('planktotron_no'))
 
 head(data.scores)  #see our results (but only the first rows)
-
-
+data <- subset(data.scores, !sampling %in% c( 1:4, 14, 18) )
+data <- data.scores
 #plot with ggplot
-ggplot(data.scores, aes(x = NMDS1, y = NMDS2, colour = treat))+           #treatments in same colour
-  geom_point(size = 4)+
-  scale_y_continuous(breaks = seq(-0.5, 1.0, 0.25), limits=c(-0.51, 1.0))+
-  annotate('text', x = 0.5, y = 0.6, label = paste('Stress:', round(nmds$stress, 3)))+   #3 gives number of digits
-  theme_bw()                                                          
-  
+ggplot(data, aes(x = NMDS1, y = NMDS2, colour = treat, shape = as.factor(sampling)))+           #treatments in same colour
+  geom_point(size = 4, aes(fill = treat))+
+  scale_color_manual(values = c( '#000000','#0868ac','#41b6c4','#31a354','#addd8e','#fed976'))+
+  scale_shape_manual(values = c(15,10,17))+
+  labs(shape = 'sampling', col = 'Fluctuatin frequency')+  
+  annotate('text', x = 0.1, y = 0.25, label = paste('Stress:', round(nmds$stress, 3)))+   #3 gives number of digits
+  theme_bw()        
+#ggsave(plot = last_plot(), file = 'NMDS_counting.png')  
 ## stress
 # stress < 0.05 excellent representation
 # stress < 0.1 great
 # stress < 0.2 okay
 # stress < 0.3 poor represented
 # stress > 0.3 choose another method
+
+
+################################################################################
+##### Ordiellipse Graph####
+NMDS = data.frame(NMDS1 = data$NMDS1, NMDS2=data$NMDS2, group=as.factor(data$treat))#sets up data frame 
+
+g1<-ggplot(data = NMDS, aes(NMDS1, NMDS2))+   
+  geom_point(aes(color = group), size=3)+  
+  stat_ellipse(geom = 'polygon', type = "norm", linetype = 2, aes(fill=group, col = group), alpha = 0.2, level = 0.99) +
+  theme_bw() 
+g1
+
