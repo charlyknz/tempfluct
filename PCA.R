@@ -150,7 +150,7 @@ PCA$sampling <- gsub("6", "06", PCA$sampling)
 PCA$sampling =as.numeric(PCA$sampling)
 PCA <- arrange(PCA, sampling)
 
-ggplot(pca_dat,aes(x=PC1,y=PC2)) + 
+ggplot(PCA,aes(x=PC1,y=PC2)) + 
   geom_point(size=1.5,aes(color = fluctuation,  group = fluctuation)) +
   #geom_line(arrow = arrow( ends = "both", type = "open"), aes(linetype = fluctuation))+
   geom_path(aes(x = PC1, y = PC2, group = fluctuation, col = fluctuation, linetype = fluctuation), 
@@ -174,7 +174,7 @@ ggplot(pca_dat,aes(x=PC1,y=PC2)) +
 #calculate euclidian distance
 
 pca_dat <- pigment_data.active %>%
-  dist()%>% 
+  dist()%>% ## rawdata
   prcomp(scale=T)%>% 
   broom::tidy() %>% 
   mutate(PC=sprintf("PC%d", PC)) %>% 
@@ -310,7 +310,9 @@ PCA <- prin_comp$x %>%
   as.data.frame %>%
   rownames_to_column("fluctuation_sampling") %>%
   separate(fluctuation_sampling,into = c("fluctuation", 'sampling'),'_') %>%
-  dplyr::select(PC1, PC2, fluctuation, sampling)
+  dplyr::select(PC1, PC2, PC3, PC4, fluctuation, sampling) 
+ 
+ 
 
 ##change format to bring variables in the right direction
 PCA$fluctuation <- factor(as.factor(PCA$fluctuation),levels=c("0", "48", "36", '24', '12', '6'))
@@ -319,14 +321,18 @@ PCA$sampling =as.numeric(PCA$sampling)
 PCA <- arrange(PCA, sampling)
 
 ggplot(PCA,aes(x=PC1,y=PC2)) + 
+  geom_hline(yintercept = 0, linetype = 'dashed', size = 0.5)+
+  geom_vline(xintercept = 0, linetype = 'dashed', size = 0.5)+
   geom_point(size=1.5,aes( group = fluctuation , col = as.factor(fluctuation))) +
   #geom_line(arrow = arrow( ends = "both", type = "open"), aes(linetype = fluctuation))+
-  geom_path(aes(x = PC1, y = PC2, group = fluctuation, col = as.factor(fluctuation), linetype = fluctuation), 
+  geom_path(aes(x = PC1, y = PC2, group = fluctuation, col = as.factor(fluctuation), linetype = as.factor(fluctuation)), 
             arrow = arrow(ends = 'last',type = 'closed',length = unit(0.35, "cm")))+
-  scale_color_manual(values = c( '#000000', '#0868ac','#31a354','#41b6c4','#addd8e','#fed976'))+
+  scale_color_manual(values = c( '#000000', '#0868ac','#41b6c4','#31a354','#addd8e','#fed976'))+
+  scale_y_continuous(limits = c(-6.2, 6.2), breaks = c(-6,-4,-2,0,2,4,6))+
+  scale_x_continuous(limits = c(-6.2, 6.2), breaks = c(-6,-4,-2,0,2,4,6))+
   labs(x=paste0("PC1: ",round(prop_varex[1]*100,1),"%"),
        y=paste0("PC2: ",round(prop_varex[2]*100,1),"%")) +
-  facet_wrap(~fluctuation)+
+  #facet_wrap(~fluctuation)+
   theme( panel.background = element_rect(fill = NA), #loescht den Hintergrund meines Plots/ fuellt ihn mit nichts
          #panel.grid.major.y = element_line(color='grey', linetype = 'dashed', size=0.2),
          panel.border= element_rect(colour = "black", fill=NA, size=0.5),
@@ -336,6 +342,29 @@ ggplot(PCA,aes(x=PC1,y=PC2)) +
          legend.position  ='bottom',
          legend.key = element_blank(),
          text = element_text(size=14))
-#ggsave(plot = last_plot(), file = 'PCA_rel_pigments.png')
+ggsave(plot = last_plot(), file = 'PCA_all_rel_pigments.png', width = 6, height = 7)
 
+#### calculate Euclidian distance of PC1-4 (Fukami et al. 2005)
+dist <- PCA %>%
+  mutate(id = paste(fluctuation, sampling, sep ='_')) %>%
+  column_to_rownames('id')%>%
+  dplyr::select(-fluctuation, -sampling)%>%
+  dist() %>%
+  broom::tidy() %>% 
+  separate(item1, c('fluctuation', 'sampling'), '_')%>%
+  separate(item2, c('fluctuation2', 'sampling2'), '_') %>%
+  group_by(sampling)%>%
+  summarise(mean = mean(distance, na.rm =T),
+            sd = sd(distance, na.rm = T),
+            se = sd/sqrt(n()))
+dist$sampling =as.numeric(dist$sampling)
+dist <- arrange(dist, sampling)
 
+ggplot(dist, aes(x = sampling, y = mean))+
+  geom_point()+
+  geom_errorbar(aes(ymin = mean-se, ymax = mean+se), width = .5)+
+  geom_line()+
+  scale_y_continuous(limits = c(0, 6), breaks = seq(0,6,2))+
+  labs(x = 'sampling', y = 'distance among treatments')+
+  theme_bw()
+#ggsave(plot = last_plot(), file = 'distance_rel_pigments.png')
