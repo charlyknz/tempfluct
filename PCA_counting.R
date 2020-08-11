@@ -237,7 +237,7 @@ ggplot(PCA_BV,aes(x=PC1,y=PC2)) +
 
 
 #### Euclidian distance ####
-dist <- PCA %>%
+dist <- PCA_BV %>%
   mutate(id = paste(fluctuation, sampling, sep =' ')) %>%
   column_to_rownames('id')%>%
   dplyr::select(-fluctuation, -sampling)%>%
