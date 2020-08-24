@@ -15,24 +15,27 @@ master_data <- left_join(Mastertable, treatments, by = c('MC'))
 
   
 master <- master_data %>%
-  select(MC, sampling, treatment, fluctuation, carbon_umol_l, overall_abundance_l) %>%
-  gather(key = 'variable', value = 'abundance_carbon', -MC, -sampling, -treatment, -fluctuation, ) %>%
+  select(MC, sampling, treatment, fluctuation, carbon_umol_l, C_Zoo_µmol_l ) %>%
+  gather(key = 'variable', value = 'carbon', -MC, -sampling, -treatment, -fluctuation, ) %>%
   mutate(dummy = paste(ifelse(variable == 'carbon_umol_l', 'phytoplankton', 'zooplankton'))) %>%
   group_by(sampling, treatment, fluctuation, dummy) %>%
-  summarise(mean = log10(mean(abundance_carbon, na.rm = T)),
-            sd = sd(abundance_carbon, na.rm = T),
-            se = log10(sd/sqrt(n()))) %>%
+  summarise(mean = mean(carbon, na.rm = T),
+            sd = sd(carbon, na.rm = T),
+            se = sd/sqrt(n())) %>%
   mutate(treatment_dummy = paste(treatment, dummy, sep = '_')) %>%
   drop_na(mean)
 
 master$treatment = factor(as.factor(master$treatment), levels = c('con', 'F48', 'F36', 'F24', 'F12', 'F6'))
-ggplot(master, aes(x = sampling, y = mean, shape = dummy, group = treatment_dummy, col = treatment))+
-  geom_point()+
-  geom_line(aes(linetype = dummy))+
-  labs(y = 'Log10(mean abundance/carbon umol/l)')+
-  scale_color_manual(values = c( '#000000','#0868ac','#41b6c4','#31a354','#addd8e','#fed976'))+
-  theme_classic()
-#ggsave(plot = last_plot(), file = 'zoo_phyto.png')
+ggplot(master, aes(x = sampling, y = mean,group = treatment_dummy))+
+  geom_point(aes(fill = treatment),size = 3, pch = 21, color = 'black')+
+  geom_errorbar(aes(ymin = mean - se, ymax = mean + se), width = .5)+
+  geom_line(linetype = 'dashed')+
+  labs(y = 'mean carbon umol/l')+
+  scale_fill_manual(values = c( '#000000','#0868ac','#41b6c4','#31a354','#addd8e','#fed976'))+
+  facet_wrap(~dummy, scales = 'free_y')+
+  theme_classic()+
+  theme(legend.position = 'bottom')
+ggsave(plot = last_plot(), file = 'zoo_phyto.png', width = 8, height = 5)
 
 
 #############################################################

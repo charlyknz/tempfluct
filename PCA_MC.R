@@ -57,20 +57,29 @@ all_data <- left_join(counts, df, by = c('MC')) %>%
   dplyr::select(treatment_id, MC, sampling, species, phylum, cells_ml,mean_BioV) %>%
   mutate(volume = cells_ml*mean_BioV)  #calculate biovolume
 
+data0 <- filter(all_data,sampling == 0)
+data0$MC[data0$MC == 4] <-1
+data0$MC[data0$MC == 11] <-12
+data0$MC[data0$MC == 8] <-9
+data0$MC[data0$MC == 3] <-5
+data0$MC[data0$MC == 6] <-7
+data0$MC[data0$MC == 10] <-2
+
 #new df to calculate mean biovolume
 pca_BV <- all_data%>%
+  bind_rows(., data0)%>%
   group_by(sampling, treatment_id, MC) %>%
   mutate(sum = sum(volume, na.rm  =T ),
          rel = volume/sum)%>%
-  group_by(treatment_id, sampling, species) %>%
+  group_by(treatment_id, MC, sampling, species) %>%
   summarise(mean_V = mean(rel, na.rm = T),
             sd_V = sd(rel, na.rm = T),
             se_V = sd_V/sqrt(n())) %>% #calculate mean cells with biovolume
   dplyr::select(-sd_V) %>%
   drop_na(mean_V) %>%
   ungroup()%>%
-  mutate(dummy = paste(treatment_id, sampling, sep = ' ')) %>%
-  dplyr::select(-treatment_id, -sampling, -se_V)%>%
+  mutate(dummy = paste(treatment_id, MC, sampling, sep = ' ')) %>%
+  dplyr::select(-treatment_id, -sampling, -se_V, -MC)%>%
   spread(key = species, value = mean_V) %>%
   column_to_rownames('dummy')
 
@@ -113,8 +122,8 @@ plot(cumsum(prop_varex), xlab = "Principal Component",
 PCA_BV <- prin_comp$x %>% 
   as.data.frame %>%
   rownames_to_column("fluctuation_sampling") %>%
-  separate(fluctuation_sampling,into = c("fluctuation", 'sampling'),' ') %>%
-  dplyr::select(PC1, PC2, PC3, PC4, PC5, PC6,fluctuation, sampling) %>%
+  separate(fluctuation_sampling,into = c("fluctuation", 'MC','sampling'),' ') %>%
+  dplyr::select(PC1, PC2, PC3, PC4, PC5, PC6,fluctuation,MC, sampling) %>%
   mutate(sampling = as.numeric(sampling))%>%
   arrange(sampling)
 
@@ -129,11 +138,11 @@ ggplot(PCA_BV,aes(x=PC1,y=PC2)) +
   geom_path(aes(x = PC1, y = PC2, group = fluctuation, col = fluctuation, linetype = fluctuation), 
             arrow = arrow(ends = 'last',type = 'closed',length = unit(0.35, "cm")))+
   scale_color_manual(values = c( '#000000', '#0868ac','#41b6c4','#31a354','#addd8e','#fed976'))+
-  scale_y_continuous(limits = c(-6.2, 6.2), breaks = c(-6,-4,-2,0,2,4,6))+
-  scale_x_continuous(limits = c(-6.2, 6.2), breaks = c(-6,-4,-2,0,2,4,6))+
+  #scale_y_continuous(limits = c(-6.2, 6.2), breaks = c(-6,-4,-2,0,2,4,6))+
+  #scale_x_continuous(limits = c(-6.2, 6.2), breaks = c(-6,-4,-2,0,2,4,6))+
   labs(x=paste0("PC1: ",round(prop_varex[1]*100,1),"%"),
        y=paste0("PC2: ",round(prop_varex[2]*100,1),"%")) +
-  facet_wrap(~fluctuation)+
+  facet_wrap(~MC)+
   theme( panel.background = element_rect(fill = NA), #loescht den Hintergrund meines Plots/ fuellt ihn mit nichts
          #panel.grid.major.y = element_line(color='grey', linetype = 'dashed', size=0.2),
          panel.border= element_rect(colour = "black", fill=NA, size=0.5),
@@ -143,20 +152,21 @@ ggplot(PCA_BV,aes(x=PC1,y=PC2)) +
          legend.position  ='bottom',
          legend.key = element_blank(),
          text = element_text(size=14))
-#ggsave(plot = last_plot(), file = 'PCA_rel_specBV.png', width = 8, height = 7)
+#ggsave(plot = last_plot(), file = 'PCA_rel_specBV_MC.png', width = 8, height = 7)
 
 
 #### Euclidian distance ####
 dist <- PCA_BV %>%
-  mutate(id = paste(fluctuation, sampling, sep =' ')) %>%
+  mutate(id = paste(fluctuation, MC, sampling, sep =' ')) %>%
   column_to_rownames('id')%>%
   dplyr::select(-fluctuation, -sampling)%>%
   dist() %>%
   broom::tidy() %>% 
-  separate(item1, c('fluctuation', 'sampling'), ' ')%>%
-  separate(item2, c('fluctuation2', 'sampling2'), ' ') %>%
+  separate(item1, c('fluctuation', 'MC','sampling'), ' ')%>%
+  separate(item2, c('fluctuation2', 'MC2','sampling2'), ' ') %>%
   group_by(sampling, fluctuation)%>%
-  filter(fluctuation2 == 'control' )%>%
+  filter(fluctuation2 == 'control' & fluctuation != 'control')%>%
+  filter(sampling == sampling2) %>%
   summarise(mean = mean(distance, na.rm =T),
             sd = sd(distance, na.rm = T),
             se = sd/sqrt(n()))
@@ -167,7 +177,7 @@ ggplot(subset(dist, fluctuation != 'control'), aes(x = sampling, y = mean, group
   geom_point(aes(fill = fluctuation), pch = 21, size = 3)+
   geom_errorbar(aes(ymin = mean-se, ymax = mean+se), width = .8)+
   geom_line(linetype = 'dashed', aes(col = fluctuation))+
-  scale_y_continuous(limits = c(0, 10), breaks = seq(0,10,2))+
+  scale_y_continuous(limits = c(0, 15), breaks = seq(0,15,5))+
   scale_fill_manual(values = c( '#fed976','#addd8e','#31a354','#41b6c4','#0868ac'))+
   scale_color_manual(values = c( '#fed976','#addd8e','#31a354','#41b6c4','#0868ac'))+
   labs(x = 'sampling', y = 'Euclidian distance to control (based on PC 1:6)', title = 'dissimilarity of species contribution to BV')+
@@ -180,6 +190,7 @@ ggplot(subset(dist, fluctuation != 'control'), aes(x = sampling, y = mean, group
          legend.key = element_blank(),
          text = element_text(size=12))
 #ggsave(plot = last_plot(), file = 'distance_treatment_to_control.png', width = 10, height = 6)
+
 
 ############################# PCA ###############################################
 #### Data preparation #### 
