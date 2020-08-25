@@ -20,12 +20,11 @@ data$cells_ml <- as.numeric(gsub(",", ".", data$cells_ml))
 #data1 <- filter(data, !comment %in% 'recount')
 
 #first look at the data
-ggplot(data, aes(x = sampling, y = cells_ml, fill = species))+
-  geom_col()+
-  facet_wrap(~MC)+
+ggplot(data, aes(x = sampling, y = cells_ml, col = species))+
+  geom_point()+
+  facet_wrap(~MC, scales = 'free_y')+
   theme_bw()
 
-########################################################################################
 
 ## merge with treatment information
 treatments <- read.csv2('~/Desktop/MA/MA_Rcode/project_data/treatments_units.csv')
@@ -34,18 +33,68 @@ names(treatments) = c('MC', 'fluctuation', 'treatment')
 rich <- left_join(data, treatments, by = c('MC')) %>%
   separate(species, into = c('genus', 'species'), ' ')
 
+########################################################################################
+# calculate species abundance over time 
 spec <- rich %>%
   mutate(species_id = paste(genus, species, sep = ' '))  %>%
+  filter(sampling != 0)%>%
   group_by(treatment, sampling, species_id) %>%
   summarise(mean_cells = mean(cells_ml, na.rm = T), 
             sd = sd(cells_ml, na.rm = T),
             se = sd/sqrt(n())) %>%
-  ggplot(., aes(x = treatment, y = mean_cells, fill = species_id))+
-  geom_col()+
-  facet_wrap(~sampling)+
-  theme_bw()
-spec
+  select(-sd)
+
+spec0 <- rich %>% 
+  filter(sampling == 0) %>%
+  mutate(species_id = paste(genus, species, sep = ' '))  %>%
+  group_by( sampling, species_id) %>%
+  summarise(con = mean(cells_ml, na.rm = T),
+            F6 = mean(cells_ml, na.rm = T),
+            F12 = mean(cells_ml, na.rm = T),
+            F24 = mean(cells_ml, na.rm = T),
+            F36 = mean(cells_ml, na.rm = T),
+            F48 = mean(cells_ml, na.rm = T),
+            sd_con = sd(cells_ml, na.rm = T),
+            sd_F6 = sd(cells_ml, na.rm = T),
+            sd_F12 = sd(cells_ml, na.rm = T),
+            sd_F24 = sd(cells_ml, na.rm = T),
+            sd_F36 = sd(cells_ml, na.rm = T),
+            sd_F48 = sd(cells_ml, na.rm = T),
+            se_con= sd_con/sqrt(n()),
+            se_F6= sd_F6/sqrt(n()),
+            se_F12= sd_F12/sqrt(n()),
+            se_F24= sd_F24/sqrt(n()),
+            se_F36= sd_F36/sqrt(n()),
+            se_F48= sd_F48/sqrt(n()))%>%
+  select(-sd_con,-sd_F6, -sd_F12, -sd_F24, -sd_F36, -sd_F48)%>%
+  gather(key = 'treatment', value = 'mean_cells',  -sampling, -species_id, -se_con,-se_F6, -se_F12, -se_F24, -se_F36, -se_F48) %>%
+  gather(key = 'variable', value = 'se', -sampling, -species_id, -treatment,-mean_cells) %>%
+  select(-variable) %>%
+  distinct(sampling, species_id,treatment, mean_cells, se) %>%
+  na.omit()
   
+all_spec <- rbind(spec0, spec) %>%
+  filter(species_id != 'Rhizosolemia indet.')%>%
+  mutate(fluctuation = as.numeric(paste(ifelse(treatment == 'con', 0, 
+         ifelse(treatment == 'F48', 48, ifelse(treatment == 'F36', 36, ifelse(treatment == 'F24', 24,
+         ifelse(treatment == 'F12',12,6))))))))
+
+all_spec$fluctuation <- factor(as.factor(all_spec$fluctuation),levels=c("0", "48", "36", '24', '12', '6'))
+
+ggplot(subset(all_spec, sampling < 11), aes(x = sampling, y = mean_cells,  group = fluctuation))+
+  geom_line(linetype = 2)+
+  geom_point(aes(fill = fluctuation), size = 3,col = '#000000', pch = 21)+
+  geom_errorbar(aes(ymin = mean_cells - se,  ymax = mean_cells + se), width = .5)+
+  scale_fill_manual(values = c( '#000000','#0868ac','#41b6c4','#31a354','#addd8e','#fed976'))+
+  labs(x = 'sampling', y= expression(cells~mL^{-1}))+
+  facet_wrap(~species_id, scales = 'free_y')+
+  theme_bw()+
+  theme(legend.position = 'bottom')
+#ggsave(plot = last_plot(), file = 'species_abundance_overtime10.png')
+########################################################################################
+#### indices abundance based ####
+#calculate richness, evenness, shannon and simpson based on abundance data
+
 shannon <- rich %>%
   select(treatment, fluctuation,  genus, species, sampling,cells_ml, MC)%>%
   mutate(species_id = paste(genus, species, sep = '_'))%>%
@@ -110,6 +159,7 @@ ggplot(subset(data_index, sampling == 10), aes(x = fluctuation, y = mean)) +
 #ggsave(plot = last_plot(), file = 'indices_samp10_counting.png')
 
 ########################################################################################
+########################################################################################
 #### Biovolume ####
 algal_measurement <- read_delim("~/Desktop/MA/MA_Rcode/project_data/algal_measurement.csv", 
                                 ";", escape_double = FALSE, locale = locale(decimal_mark = ","), 
@@ -138,18 +188,21 @@ rel_BV <- all_data%>%
          rel_V = volume/sum) %>%
   group_by(treatment, sampling, fluctuation, species_id) %>%
   summarise(mean_contr = mean(rel_V, na.rm = T),
-            rel_contr = mean_contr*100 ) %>% #calculate mean cells with biovolume
+            sd_contr = sd(rel_V, na.rm =T),
+            se_contr = sd_contr/ sqrt(n()),
+            rel_contr = mean_contr*100,
+            se_rel = se_contr*100) %>% #calculate mean cells with biovolume
     filter(mean_contr >0.01)
 
 rel_BV$fluctuation <- factor(as.factor(rel_BV$fluctuation),levels=c("0", "48", "36", '24', '12', '6'))
 
 
 #plot
-ggplot(rel_BV, aes( x = fluctuation, y = rel_contr))+
+ggplot(rel_BV, aes( x = sampling, y = rel_contr))+
   geom_col(aes(fill = species_id), col = 'black')+
   #scale_y_continuous(limits = c(0,100), breaks = seq(0,100, 20))+
-  facet_wrap(~sampling)+
-  labs(x = 'Fluctuation frequency (in H)', y = 'mean contribution of species to BioV', fill = 'species')+
+  facet_wrap(~treatment)+
+  labs(x = 'sampling', y = 'mean contribution of species to BioV', fill = 'treatment')+
   theme( panel.background = element_rect(fill = NA), #loescht den Hintergrund meines Plots/ fuellt ihn mit nichts
          #panel.grid.major.y = element_line(color='grey', linetype = 'dashed', size=0.2),
          panel.border= element_rect(colour = "black", fill=NA, size=0.5),
@@ -162,8 +215,8 @@ ggplot(rel_BV, aes( x = fluctuation, y = rel_contr))+
 #ggsave(plot=last_plot(), file = 'rel_V_perspecies.png', width = 11, height = 8)
  
 
-#####################################################################
-#shannon based on BioV
+########################################################################################
+#### indices based on BioV ####
 
 shannon_BV <- all_data %>%
   mutate(species_id = paste(genus, species, sep = '_'))%>%

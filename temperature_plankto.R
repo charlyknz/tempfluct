@@ -35,10 +35,10 @@ temp <- all_temperatures %>%
   filter(date > "2019-08-26", date < "2019-10-02") %>% #datetime between two dates
   filter(unit %in% c(1,2,5,6,8,11)) #keep only one replicate
   
-
+dev.off()
 #plot temperature curves
-temp$unit = factor(temp$unit, levels = c(1,5, 11,8,2,6))
-label_temp <- c('1' = 'constant', '2' = 'fluctuating 36 h', '5' = 'fluctuating 6h', '6' = 'fluctuating 48 h','8' = 'fluctuating 24 h', '11' = 'fluctuating 12 h')
+temp$unit = factor(temp$unit, levels = c(1,6,2,8, 11,5))
+label_temp <- c('1' = 'constant', '2' = 'Fluctuating 36 h', '5' = 'Fluctuating 6h', '6' = 'Fluctuating 48 h','8' = 'Fluctuating 24 h', '11' = 'Fluctuating 12 h')
 plot <- ggplot(temp, aes(x = datetime, y = actual_tempmiddle))+
   #geom_hline(aes(yintercept = 18), col = 'darkgrey', linetype = 'dashed', size = 0.5)+
   geom_line(size = 1.2)+
@@ -47,10 +47,10 @@ plot <- ggplot(temp, aes(x = datetime, y = actual_tempmiddle))+
   scale_y_continuous(limits = c(14, 22), breaks = c(15,18,21))+
   scale_x_datetime(breaks = '4 days')+
   theme_classic()+
-  theme(text= element_text(size = 12),
+  theme(text= element_text(size = 18),
         strip.text = element_text(face = 'bold'))
 plot
-#ggsave(plot = plot, file = 'temp_curves.png', width = 20, height = 10)
+#ggsave(plot = plot, file = 'temp_curves.png', width = 18, height = 10)
 ## ------------------------------------------------------------------------------ ##
 ## ------------------------------------------------------------------------------ ##
 
