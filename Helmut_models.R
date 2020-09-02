@@ -63,26 +63,43 @@ plot(fitted(mod1),resid(mod1),ylab="residuales")
 qqnorm(resid(mod1), main=""); 
 qqline(resid(mod1))
 
+data1$fit_InterceptOnly7 <- predict(mod1)
+
+#### plot fitted values ####
+data_plot <- data1 %>%
+  group_by(interval, treatment, sampling) %>%
+  mutate(mean = mean(c_umol_l, na.rm = T),
+         sd = sd(c_umol_l, na.rm = T),
+         se = sd/sqrt(n())) %>%
+  distinct(interval, dayname, treatment, day, MC, c_umol_l, mean, se)
+mod2 <- lmer(mean ~ interval*day + (1|MC) + (1|dayname), data=data_plot)
+data_plot$fit_InterceptOnly7 <- predict(mod2)
+
+ggplot(data_plot, aes(x = day, y=c_umol_l, col = treatment, group = MC ))+
+  geom_point()+
+  #geom_errorbar(aes(ymin = mean - se, ymax = mean + se), width = .5)+
+  geom_line(aes(y = fit_InterceptOnly7), size = 0.5)+
+  scale_x_continuous(limits = c(0,36), breaks = seq(0,36,4))+
+  scale_y_continuous(limits = c(100,300), breaks = seq(100,300,20))+
+  labs(x = 'time (in days)', y = expression('Carbon in micromol/ L'))+
+  theme_classic()
+
 ####################################################################
-####################################################################
-Mastertable <- read_delim("~/Desktop/MA/MA_Rcode/project_data/Mastertable.csv", 
+#######################Zooplankton###########################
+Mastertable <- read_delim("~/Desktop/MA/MA_Rcode/project_data/Mastertable_fluctron.csv", 
                           ";", escape_double = FALSE, locale = locale(decimal_mark = ","), 
                           trim_ws = TRUE) %>%
   rename(MC = planktotron)
 str(Mastertable)
 
 ## merge with treatment information
-treatments <- read.csv2('~/Desktop/MA/MA_Rcode/project_data/treatments_units.csv')
-str(treatments)
-names(treatments) = c('MC', 'fluctuation', 'treatment')
-master_data <- left_join(Mastertable, treatments, by = c('MC')) 
 
-
-master <- master_data %>%
-  select(MC, sampling, treatment, fluctuation, C_Zoo_µmol_l ) %>%
+master <- Mastertable %>%
+  dplyr::select(MC, sampling, fluctuation, C_Zoo_µmol_l ) %>%
   drop_na(C_Zoo_µmol_l) %>%
   mutate(day = 2* sampling, 
-         dayname = as.factor(day)) %>%
+         dayname = as.factor(day),
+         MC = as.character(MC)) %>%
   mutate(interval = 48/fluctuation)
 master$interval[!is.finite(master$interval)] <- 0
   
@@ -90,6 +107,7 @@ master$interval[!is.finite(master$interval)] <- 0
 # Explanatory variables: fluctuation interval in 48 h + day (time)
 # Random: MC number
 #         dayname (categorical variable)
+str(master)
 
 zoo1 <- lmer(C_Zoo_µmol_l ~ interval*day + (1|MC) + (1|dayname), data=master)
 summary(zoo1)
@@ -104,7 +122,7 @@ qqnorm(resid(zoo1), main="");
 qqline(resid(zoo1))
 
 
-########################COMPOSITION LMM##########################################
+########################Phytoplankton COMPOSITION LMM##########################################
 
 #### composition data ####
 CountsBV <-read_delim("~/Desktop/MA/MA_Rcode/project_data/CountsBV.csv", 
@@ -127,7 +145,7 @@ data_comp <- CountsBV %>%
 data_comp[is.na(data_comp)] <- 0 #substitute NAs with 0
 
 #calculate bray distance using vegdist 
-data.dist <- vegdist(data_comp, "bray") %>% #distance calculation
+data.dist <- vegdist(data_comp, 'bray') %>% #distance calculation
   broom::tidy() %>% #change to df
   separate(item1, into = c('treatment', 'MC', 'sampling'), ' ') %>% #separate item1,2 into variable columns
   separate(item2, into = c('treatment2','MC2', 'sampling2'), ' ') %>%
@@ -179,7 +197,7 @@ qqline(resid(bray1))
 
 ###################################################################################
 
-####PCA on pigment data only ####
+####pigment data ####
 pigment <- read.csv2("~/Desktop/MA/MA_Rcode/project_data/master_pigments.csv", sep = ";", dec = ',')
 str(pigment)
 
@@ -270,4 +288,99 @@ hist(resid(bray1), ylab="frecuencia",xlab="residuales", main="")
 plot(fitted(bray1),resid(bray1),ylab="residuales")
 qqnorm(resid(bray1), main=""); 
 qqline(resid(bray1))
+
+############################################################################################################
+#### Stoichiometry ####
+# import data #
+Mastertable_fluctron <- read_delim("~/Desktop/MA/MA_Rcode/project_data/Mastertable_fluctron.csv", 
+                                   ";", escape_double = FALSE, locale = locale(decimal_mark = ","), 
+                                   trim_ws = TRUE)
+#View(Mastertable_fluctron)
+str(Mastertable_fluctron)
+
+# import treatment information
+
+
+### subdataframe with nutrient informations only ####
+
+nutrients_master <- dplyr::select(Mastertable_fluctron, fluctuation, sampling, planktotron, carbon_umol_l, nitrate_umol_l, 
+                                  'diss_Nitrat+Nitrit_umol_l', diss_Silikat_umol_l, diss_Phosphat_umol_l,
+                                  POP_micromol_l, SiP_micromol_l)
+names(nutrients_master)
+
+############################################################################################################
+#### calculate ratios ####
+
+ratio <- nutrients_master %>%
+  mutate(CN = carbon_umol_l/nitrate_umol_l,
+         NP = nitrate_umol_l/POP_micromol_l,
+         CP = carbon_umol_l/POP_micromol_l,
+         CSi = carbon_umol_l/SiP_micromol_l,
+         NSi = nitrate_umol_l/SiP_micromol_l,
+         SiP = SiP_micromol_l/POP_micromol_l) %>%
+  dplyr::select(nitrate_umol_l,fluctuation, sampling, planktotron,SiP_micromol_l,CN, NP, CP, CSi, NSi, NSi, SiP)%>%
+  rename( MC = planktotron) %>%
+  mutate(day = 2* sampling, 
+         dayname = as.factor(day),
+         MC = as.character(MC)) %>%
+  mutate(interval = 48/fluctuation) #%>%
+  #drop_na(SiP)
+ratio$interval[!is.finite(ratio$interval)] <- 0
+  
+
+#### Model
+CN1 <- lmer(CSi ~ interval*day + (1|MC) + (1|dayname), data=ratio)
+summary(CN1)
+anova(CN1)
+
+#output:
+
+# CN interval:day 2.635e-05 ***
+# CSi time **
+# SiP time **
+# NSi time **
+# SiP_micromol_l time **
+# P no sign
+# NP no sign
+# CP no sign
+# NP no sign
+
+#plot residuals
+par(mfrow=c(2,2),cex.axis=1.2, cex.lab=1.5)
+plot(resid(CN1), ylab="residuales")
+hist(resid(CN1), ylab="frecuencia",xlab="residuales", main="")
+plot(fitted(CN1),resid(CN1),ylab="residuales")
+qqnorm(resid(CN1), main=""); 
+qqline(resid(CN1))
+
+
+
+#### RUE ####
+RUE <- nutrients_master %>%
+  dplyr::select(fluctuation, planktotron, sampling, carbon_umol_l, nitrate_umol_l, POP_micromol_l, 'diss_Nitrat+Nitrit_umol_l', 'diss_Phosphat_umol_l') %>%
+  rename(diss_P = 'diss_Phosphat_umol_l',
+         diss_N = 'diss_Nitrat+Nitrit_umol_l') %>%
+  mutate(TP = diss_P + POP_micromol_l,
+         TN = diss_N + nitrate_umol_l) %>%
+  drop_na(carbon_umol_l) %>%
+  mutate(P_RUE = carbon_umol_l/ TP,
+         N_RUE = carbon_umol_l/ TN) %>%
+  rename( MC = planktotron) %>%
+  mutate(day = 2* sampling, 
+         dayname = as.factor(day),
+         MC = as.character(MC),
+         fluctuation = as.numeric(fluctuation)) %>%
+  mutate(interval = 48/fluctuation) #%>%
+#drop_na(SiP)
+RUE$interval[!is.finite(RUE$interval)] <- 0
+
+#### Model
+mod_N <- lmer(N_RUE ~ interval*day + (1|MC) + (1|dayname), data=RUE)
+summary(mod_N)
+anova(mod_N) #interval:day 36.817  36.817     1 98.000 23.1380 5.461e-06 ***##
+
+mod_P <- lmer(P_RUE ~ interval*day + (1|MC) + (1|dayname), data=RUE)
+summary(mod_P)
+anova(mod_P) #interval:day 5598.4  5598.4     1 97.999  2.8345 0.09544 .
+
 

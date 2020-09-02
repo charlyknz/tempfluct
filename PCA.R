@@ -132,17 +132,18 @@ ggplot(PCA_BV,aes(x=PC1,y=PC2)) +
   scale_y_continuous(limits = c(-6.2, 6.2), breaks = c(-6,-4,-2,0,2,4,6))+
   scale_x_continuous(limits = c(-6.2, 6.2), breaks = c(-6,-4,-2,0,2,4,6))+
   labs(x=paste0("PC1: ",round(prop_varex[1]*100,1),"%"),
-       y=paste0("PC2: ",round(prop_varex[2]*100,1),"%")) +
-  facet_wrap(~fluctuation)+
+       y=paste0("PC2: ",round(prop_varex[2]*100,1),"%"),
+       linetype = 'Fluctuation \nfrequency [h]', color = 'Fluctuation \nfrequency [h]') +
+ # facet_wrap(~fluctuation)+
   theme( panel.background = element_rect(fill = NA), #loescht den Hintergrund meines Plots/ fuellt ihn mit nichts
          #panel.grid.major.y = element_line(color='grey', linetype = 'dashed', size=0.2),
-         panel.border= element_rect(colour = "black", fill=NA, size=0.5),
+         panel.border= element_rect(colour = "black", fill=NA, size=1),
          strip.background = element_rect(color ='black', fill = 'white'),
          strip.text = element_text(face = 'bold'),
          legend.background = element_blank(),
          legend.position  ='bottom',
          legend.key = element_blank(),
-         text = element_text(size=14))
+         text = element_text(size=16))
 #ggsave(plot = last_plot(), file = 'PCA_rel_specBV.png', width = 8, height = 7)
 
 

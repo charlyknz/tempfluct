@@ -124,6 +124,20 @@ data_diversity$rich = apply(ab_presence, MARGIN = 1, FUN = sum) #new column cont
 
 data_diversity$evenness = data_diversity$shannon/log(data_diversity$rich)
 
+#### LMM on diversity ####
+modell_dat <- data_diversity %>%
+  dplyr::select(planktotron, sampling, treatment,evenness, simpson) %>%
+  separate(treatment, into = c('mist', 'fluctuation'), '_') %>%
+  mutate(day = sampling *2,
+         dayname = as.factor(day)) %>%
+  mutate(fluctuation = as.numeric(fluctuation),
+         interval = 48/fluctuation)
+modell_dat$interval[is.na(modell_dat$interval)] <-0
+modell_dat$fluctuation[is.na(modell_dat$fluctuation)] <-0
+div <- lmer(evenness ~ interval*day + (1|planktotron) + (1|dayname), data=modell_dat)
+summary(div)
+anova(div)
+
 #data wrangling
 data_plot  <- data_diversity %>%
   select(sampling, treatment,planktotron,shannon, evenness, rich, simpson) %>%
@@ -132,28 +146,50 @@ data_plot  <- data_diversity %>%
   summarise(mean_index = mean(value, na.rm = T),
             sd_index = sd(value, na.rm = T),
             se_index = sd_index/sqrt(n())) %>%
-  separate(treatment, into = c('mist', 'fluctuation'), '_')
+  separate(treatment, into = c('mist', 'fluctuation'), '_') %>%
+  mutate(day = sampling *2)
 data_plot$fluctuation[is.na(data_plot$fluctuation)] <- 0
 
 #plot
 data_plot$fluctuation <- factor(as.factor(data_plot$fluctuation),levels=c("0", "48", "36", '24', '12', '6'))
 
-ggplot(subset(data_plot, sampling <10 & index %in% c('evenness', 'shannon')), aes(x =sampling, y = mean_index))+
-  #geom_line(linetype = 'dashed', size = 0.5)+
-  geom_point(aes(fill = fluctuation), pch=21, size=4, col = '#000000')+
+simpson <- ggplot(subset(data_plot, index %in% c('simpson')), aes(x =day, y = mean_index))+
+  geom_line(linetype = 'dashed', size = 0.5, aes(color = fluctuation))+
+  geom_point(aes(fill = fluctuation), pch=21, size=3, col = '#000000')+
   geom_errorbar(aes(ymin = mean_index - se_index, ymax = mean_index+se_index), width = .5)+
   scale_fill_manual(values = c( '#000000','#0868ac','#41b6c4','#31a354','#addd8e','#fed976'))+
-  facet_wrap(~index, scales ='free_y', ncol = 1)+
-  ylab(label = 'mean index of pigment diversity')+
+  scale_color_manual(values = c( '#000000','#0868ac','#41b6c4','#31a354','#addd8e','#fed976'))+
+  labs(x = 'Time [days]', y= 'simpson index of pigment diversity', fill = 'Fluctuation  \nfrequency [h]', col = 'Fluctuation  \nfrequency [h]')+
   theme_classic()+
-  theme(legend.position = 'bottom', 
+  theme(panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        strip.background = element_blank(),legend.position = 'none', 
         panel.background = element_rect(fill = NA), #loescht den Hintergrund meines Plots/ fuellt ihn mit nichts
         #panel.grid.major.y = element_line(color='grey', linetype = 'dashed', size=0.2),
-        panel.border= element_rect(colour = "black", fill=NA, size=0.5),
-        strip.background = element_rect(color ='black', fill = 'white'),
-        strip.text = element_text(face = 'italic'),
+        panel.border= element_rect(colour = "black", fill=NA, size=1),
+        strip.text = element_text(face = 'bold'),
         legend.background = element_blank(),
         legend.key = element_blank(),
-        text = element_text(size=14))#
-#ggsave(plot = last_plot(), file = 'pigment_even_shan_before10.png', width = 7, height = 6)
+        text = element_text(size=17))#
+simpson 
+#ggsave(plot = last_plot(), file = 'pigment_simpson.png', width = 7, height = 6)
 
+even <- ggplot(subset(data_plot, index %in% c('evenness')), aes(x =day, y = mean_index))+
+  geom_line(linetype = 'dashed', size = 0.5, aes(color = fluctuation))+
+  geom_point(aes(fill = fluctuation), pch=21, size=3, col = '#000000')+
+  geom_errorbar(aes(ymin = mean_index - se_index, ymax = mean_index+se_index), width = .5)+
+  scale_fill_manual(values = c( '#000000','#0868ac','#41b6c4','#31a354','#addd8e','#fed976'))+
+  scale_color_manual(values = c( '#000000','#0868ac','#41b6c4','#31a354','#addd8e','#fed976'))+
+  labs(x = ' ', y= 'evenness of pigment diversity', fill = 'Fluctuation  \nfrequency [h]', col = 'Fluctuation  \nfrequency [h]')+
+  theme_classic()+
+  theme(panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        strip.background = element_blank(),legend.position = 'none', 
+        panel.background = element_rect(fill = NA), #loescht den Hintergrund meines Plots/ fuellt ihn mit nichts
+        #panel.grid.major.y = element_line(color='grey', linetype = 'dashed', size=0.2),
+        panel.border= element_rect(colour = "black", fill=NA, size=1),
+        strip.text = element_text(face = 'bold'),
+        legend.background = element_blank(),
+        legend.key = element_blank(),
+        text = element_text(size=17))#
+even 

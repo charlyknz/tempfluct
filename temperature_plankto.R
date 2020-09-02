@@ -32,7 +32,7 @@ temp <- all_temperatures %>%
   separate(timestamp, into = c('date', 'time'), sep = ' ') %>%
   mutate(time1 = as.character(time)) %>%
   filter(stringr::str_detect(time1, c(':00:1', ':30:1', ':15:1'))) %>% #keepsonly entries with 00:1 or 30:1 minute/seconds
-  filter(date > "2019-08-26", date < "2019-10-02") %>% #datetime between two dates
+  filter(date > "2019-08-26", date < "2019-09-02") %>% #datetime between two dates
   filter(unit %in% c(1,2,5,6,8,11)) #keep only one replicate
   
 dev.off()
@@ -41,16 +41,24 @@ temp$unit = factor(temp$unit, levels = c(1,6,2,8, 11,5))
 label_temp <- c('1' = 'constant', '2' = 'Fluctuating 36 h', '5' = 'Fluctuating 6h', '6' = 'Fluctuating 48 h','8' = 'Fluctuating 24 h', '11' = 'Fluctuating 12 h')
 plot <- ggplot(temp, aes(x = datetime, y = actual_tempmiddle))+
   #geom_hline(aes(yintercept = 18), col = 'darkgrey', linetype = 'dashed', size = 0.5)+
-  geom_line(size = 1.2)+
-  facet_wrap(~unit, labeller = labeller(unit = label_temp), ncol = 1)+
-  labs( x = 'date', y = 'temperature (in °C)')+
+  geom_line(size = 1.0)+
+  facet_wrap(~unit, labeller = labeller(unit = label_temp), ncol = 2)+
+  labs( x = 'Date', y = 'Temperature (in °C)')+
   scale_y_continuous(limits = c(14, 22), breaks = c(15,18,21))+
-  scale_x_datetime(breaks = '4 days')+
+  scale_x_datetime(breaks = '2 days')+
   theme_classic()+
-  theme(text= element_text(size = 18),
-        strip.text = element_text(face = 'bold'))
+  theme( panel.grid.major = element_blank(),
+         panel.grid.minor = element_blank(),
+         strip.background = element_blank(),
+         panel.border= element_rect(colour = "black", fill=NA, size=0.5),
+         #strip.background = element_rect(color ='black', fill = 'white'),
+         strip.text = element_text(face = 'bold'),
+         legend.background = element_blank(),
+         legend.position  ='bottom',
+         legend.key = element_blank(),
+         text = element_text(size=18))
 plot
-#ggsave(plot = plot, file = 'temp_curves.png', width = 18, height = 10)
+ggsave(plot = plot, file = 'temp_curves.png', width = 15, height = 10)
 ## ------------------------------------------------------------------------------ ##
 ## ------------------------------------------------------------------------------ ##
 
