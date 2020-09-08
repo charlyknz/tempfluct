@@ -33,9 +33,10 @@ ratio <- nutrients_master %>%
          SiP = SiP_micromol_l/POP_micromol_l) %>%
   dplyr::select(fluctuation, sampling, planktotron,CN, NP, CP, CSi, NSi, NSi, SiP)%>%
   gather(key = 'ratio', value = 'value', -fluctuation, -sampling, -planktotron) %>%
+  mutate(log = log10(value))%>%
   group_by(ratio, sampling, fluctuation) %>%
-  summarise(mean = mean(value, na.rm = T),
-         sd = sd(value, na.rm = T),
+  summarise(mean = mean(log, na.rm = T),
+         sd = sd(log, na.rm = T),
          se = sd/sqrt(n())) %>%
   drop_na(mean) %>%
   mutate(day = sampling *2)
@@ -101,8 +102,8 @@ RUE12$fluctuation <- factor(as.factor(RUE12$fluctuation),levels=c("0", "48", "36
 RUE$fluctuation <- factor(as.factor(RUE$fluctuation),levels=c("0", "48", "36", '24', '12', '6'))
 ggplot(RUE, aes(x = sampling, y = mean_N))+
   geom_line(linetype = 'dashed', aes(col = fluctuation))+
-  geom_point(aes(fill = fluctuation), pch = 21, col = 'black', size = 3)+
   geom_errorbar(aes(ymin = mean_N -se_N, ymax =  mean_N +se_N))+
+  geom_point(aes(fill = fluctuation), pch = 21, col = 'black', size = 3)+
   scale_fill_manual(values = c( '#000000','#0868ac','#41b6c4','#31a354','#addd8e','#fed976'))+
   scale_color_manual(values = c( '#000000','#0868ac','#41b6c4','#31a354','#addd8e','#fed976'))+
   labs(x = 'time (in days)', y = 'mean Molar ratio')+
@@ -112,8 +113,8 @@ ggplot(RUE, aes(x = sampling, y = mean_N))+
 ##########################################################
 RUE_N <- ggplot(subset(RUE12, nutrient == 'N_RUE'), aes(x = day, y = mean_N))+
   geom_line(linetype = 'dashed', aes(col = fluctuation))+
-  geom_point(aes(fill = fluctuation), pch = 21, col = 'black', size = 3)+
   geom_errorbar(aes(ymin = mean_N -se_N, ymax =  mean_N +se_N), width = .5)+
+  geom_point(aes(fill = fluctuation), pch = 21, col = 'black', size = 3)+
   scale_fill_manual(values = c( '#000000','#0868ac','#41b6c4','#31a354','#addd8e','#fed976'))+
   scale_color_manual(values = c( '#000000','#0868ac','#41b6c4','#31a354','#addd8e','#fed976'))+
   labs(x = 'Time (in days)', y = 'RUE (Total N)')+
@@ -132,8 +133,8 @@ RUE_N
 
 RUE_P <- ggplot(subset(RUE12, nutrient == 'P_RUE'), aes(x = day, y = mean_N))+
   geom_line(linetype = 'dashed', aes(col = fluctuation))+
-  geom_point(aes(fill = fluctuation), pch = 21, col = 'black', size = 3)+
   geom_errorbar(aes(ymin = mean_N -se_N, ymax =  mean_N +se_N), width = .5)+
+  geom_point(aes(fill = fluctuation), pch = 21, col = 'black', size = 3)+
   scale_fill_manual(values = c( '#000000','#0868ac','#41b6c4','#31a354','#addd8e','#fed976'))+
   scale_color_manual(values = c( '#000000','#0868ac','#41b6c4','#31a354','#addd8e','#fed976'))+
   labs(x = 'Time (in days)', y = 'RUE (Total P)')+
@@ -150,15 +151,15 @@ RUE_P <- ggplot(subset(RUE12, nutrient == 'P_RUE'), aes(x = day, y = mean_N))+
 RUE_P
 
 plot_grid(RUE_N, RUE_P, labels=c("(a)","(b)"),ncol = 2, label_size = 18, hjust = 0, vjust = 1)
-ggsave(plot = last_plot(), file = 'RUE.png', width = 9, height = 5)
+#ggsave(plot = last_plot(), file = 'RUE.png', width = 9, height = 5)
 
 CN <- ggplot(subset(ratio, ratio == 'CN') , aes( x = day, y = mean))+
-  geom_point(aes(fill = fluctuation), pch = 21, size = 3, col = 'black')+
   geom_line(linetype = 'dashed' , aes(col = fluctuation,  group = fluctuation))+
   geom_errorbar(aes(ymin = mean -se, ymax = mean + se ), width = .5)+
+  geom_point(aes(fill = fluctuation), pch = 21, size = 3, col = 'black')+
   scale_fill_manual(values = c( '#000000','#0868ac','#41b6c4','#31a354','#addd8e','#fed976'))+
   scale_color_manual(values = c( '#000000','#0868ac','#41b6c4','#31a354','#addd8e','#fed976'))+
-  labs(x = ' ', y = 'C:N ratio')+
+  labs(x = ' ', y = 'Log C:N ratio')+
   theme( panel.background = element_rect(fill = NA), #loescht den Hintergrund meines Plots/ fuellt ihn mit nichts
          #panel.grid.major.y = element_line(color='grey', linetype = 'dashed', size=0.2),
          panel.border= element_rect(colour = "black", fill=NA, size=1),
@@ -171,12 +172,12 @@ CN <- ggplot(subset(ratio, ratio == 'CN') , aes( x = day, y = mean))+
 CN
 
 CP <- ggplot(subset(ratio, ratio == 'CP') , aes( x = day, y = mean))+
-  geom_point(aes(fill = fluctuation), pch = 21, size = 3, col = 'black')+
   geom_line(linetype = 'dashed' , aes(col = fluctuation,  group = fluctuation))+
   geom_errorbar(aes(ymin = mean -se, ymax = mean + se ), width = .5)+
+  geom_point(aes(fill = fluctuation), pch = 21, size = 3, col = 'black')+
   scale_fill_manual(values = c( '#000000','#0868ac','#41b6c4','#31a354','#addd8e','#fed976'))+
   scale_color_manual(values = c( '#000000','#0868ac','#41b6c4','#31a354','#addd8e','#fed976'))+
-  labs(x = '', y = 'C:P ratio')+
+  labs(x = '', y = 'Log C:P ratio')+
   theme( panel.background = element_rect(fill = NA), #loescht den Hintergrund meines Plots/ fuellt ihn mit nichts
          #panel.grid.major.y = element_line(color='grey', linetype = 'dashed', size=0.2),
          panel.border= element_rect(colour = "black", fill=NA, size=1),
@@ -189,12 +190,12 @@ CP <- ggplot(subset(ratio, ratio == 'CP') , aes( x = day, y = mean))+
 CP
 
 CSi <- ggplot(subset(ratio, ratio == 'CSi') , aes( x = day, y = mean))+
-  geom_point(aes(fill = fluctuation), pch = 21, size = 3, col = 'black')+
   geom_line(linetype = 'dashed' , aes(col = fluctuation,  group = fluctuation))+
   geom_errorbar(aes(ymin = mean -se, ymax = mean + se ), width = .5)+
+  geom_point(aes(fill = fluctuation), pch = 21, size = 3, col = 'black')+
   scale_fill_manual(values = c( '#000000','#0868ac','#41b6c4','#31a354','#addd8e','#fed976'))+
   scale_color_manual(values = c( '#000000','#0868ac','#41b6c4','#31a354','#addd8e','#fed976'))+
-  labs(x = '', y = 'C:Si ratio', color = 'Fluctuation frequency (in h)',fill = 'Fluctuation frequency (in h)')+
+  labs(x = 'Time [days]', y = 'Log C:Si ratio', color = 'Fluctuation frequency (in h)',fill = 'Fluctuation frequency (in h)')+
   theme( panel.background = element_rect(fill = NA), #loescht den Hintergrund meines Plots/ fuellt ihn mit nichts
          #panel.grid.major.y = element_line(color='grey', linetype = 'dashed', size=0.2),
          panel.border= element_rect(colour = "black", fill=NA, size=1),

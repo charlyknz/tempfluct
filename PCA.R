@@ -188,16 +188,6 @@ ggplot(subset(dist, fluctuation != 'control'), aes(x = sampling, y = mean, group
 pigment <- read.csv2("~/Desktop/MA/MA_Rcode/project_data/master_pigments.csv", sep = ";", dec = ',')
 str(pigment)
 
-#bring data in form
-pigment_data <- pigment %>%
-  dplyr::select(-X, -no, -date)%>%
-  rename(MC = planktotron)%>%
-  mutate(MC = as.character(MC))
-
-
-####PCA on pigment data only ####
-pigment <- read.csv2("~/Desktop/MA/MA_Rcode/project_data/master_pigments.csv", sep = ";", dec = ',')
-str(pigment)
 
 #bring data in form
 pigment_data <- pigment %>%
@@ -316,18 +306,21 @@ ggplot(PCA,aes(x=PC1,y=PC2)) +
   scale_y_continuous(limits = c(-6.2, 6.2), breaks = c(-6,-4,-2,0,2,4,6))+
   scale_x_continuous(limits = c(-6.2, 6.2), breaks = c(-6,-4,-2,0,2,4,6))+
   labs(x=paste0("PC1: ",round(prop_varex[1]*100,1),"%"),
-       y=paste0("PC2: ",round(prop_varex[2]*100,1),"%")) +
-  #facet_wrap(~fluctuation)+
-  theme( panel.background = element_rect(fill = NA), #loescht den Hintergrund meines Plots/ fuellt ihn mit nichts
+       y=paste0("PC2: ",round(prop_varex[2]*100,1),"%"),
+       color =  'Fluctuation  \nfrequency [h]', linetype = 'Fluctuation  \nfrequency [h]') +
+  facet_wrap(~fluctuation)+
+  theme( panel.grid.major = element_blank(),
+         panel.grid.minor = element_blank(),
+         strip.background = element_blank(),
+         panel.background = element_rect(fill = NA), #loescht den Hintergrund meines Plots/ fuellt ihn mit nichts
          #panel.grid.major.y = element_line(color='grey', linetype = 'dashed', size=0.2),
          panel.border= element_rect(colour = "black", fill=NA, size=0.5),
-         strip.background = element_rect(color ='black', fill = 'white'),
          strip.text = element_text(face = 'bold'),
          legend.background = element_blank(),
          legend.position  ='bottom',
          legend.key = element_blank(),
          text = element_text(size=14))
-#ggsave(plot = last_plot(), file = 'PCA_all_rel_pigments.png', width = 6, height = 7)
+#ggsave(plot = last_plot(), file = 'PCA_rel_pigments.png', width = 10, height = 7)
 
 #### calculate Euclidian distance of PC1-4 (Fukami et al. 2005)
 dist_p <- PCA %>%
@@ -338,24 +331,25 @@ dist_p <- PCA %>%
   broom::tidy() %>% 
   separate(item1, c('fluctuation', 'sampling'), '_')%>%
   separate(item2, c('fluctuation2', 'sampling2'), '_') %>%
-  group_by(sampling)%>%
+  filter(fluctuation2 == '0' & fluctuation != '0')%>%
+  filter(sampling == sampling2) %>%
+  group_by(sampling, fluctuation)%>%
   summarise(mean = mean(distance, na.rm =T),
             sd = sd(distance, na.rm = T),
             se = sd/sqrt(n()))
 dist_p$sampling =as.numeric(dist_p$sampling)
 dist_p <- arrange(dist_p, sampling)
 
-ggplot(dist_p, aes(x = sampling, y = mean))+
+ggplot(dist_p, aes(x = sampling, y = mean, color = fluctuation, group = fluctuation))+
   geom_point()+
   geom_errorbar(aes(ymin = mean-se, ymax = mean+se), width = .5)+
   geom_line()+
-  scale_y_continuous(limits = c(0, 6), breaks = seq(0,6,2))+
+  #scale_y_continuous(limits = c(0, 6), breaks = seq(0,6,2))+
   labs(x = 'sampling', y = 'distance among treatments')+
   theme_bw()
 #ggsave(plot = last_plot(), file = 'distance_rel_pigments.png')
 
-
-##############################################################
+###############################################################
 #### diss pigments and BV contribution of species ####
 dist_p <- PCA %>%
   mutate(id = paste(fluctuation, sampling, sep ='_')) %>%
@@ -365,8 +359,10 @@ dist_p <- PCA %>%
   broom::tidy() %>% 
   separate(item1, c('fluctuation', 'sampling'), '_')%>%
   separate(item2, c('fluctuation2', 'sampling2'), '_') %>%
+  filter(fluctuation2 == '0' & fluctuation != '0')%>%
+  filter(sampling == sampling2) %>%
   group_by(sampling, fluctuation)%>%
-  summarise(mean = mean(distance, na.rm =T),
+ summarise(mean = mean(distance, na.rm =T),
             sd = sd(distance, na.rm = T),
             se = sd/sqrt(n()))
 dist_p$sampling =as.numeric(dist_p$sampling)
@@ -384,6 +380,8 @@ dist <- PCA_BV %>%
   broom::tidy() %>% 
   separate(item1, c('fluctuation', 'sampling'), ' ')%>%
   separate(item2, c('fluctuation2', 'sampling2'), ' ') %>%
+  filter(fluctuation2 == 'control' & fluctuation != 'control')%>%
+  filter(sampling == sampling2) %>%
   group_by(sampling, fluctuation)%>%
   summarise(mean = mean(distance, na.rm =T),
             sd = sd(distance, na.rm = T),
@@ -395,10 +393,10 @@ dist <- arrange(dist, sampling)
 dist$fluctuation[is.na(dist$fluctuation)] <-0
 
 diss_plot <- left_join(dist, dist_p, by = c('sampling', 'fluctuation'))
-ggplot(diss_plot, aes(x = comp_mean, y = pigment_mean, col = fluctuation, shape = treatment))+
-  geom_point(aes(alpha = sampling), size = 3)+
+ggplot(diss_plot, aes(x = comp_mean, y = pigment_mean, col = fluctuation, shape = as.factor(sampling)))+
+  geom_point( size = 3)+
   labs(x = 'compositional dissimilarity', y= 'pigment (functional) dissimilarity')+
   theme_classic()
-ggsave(plot = last_plot(), file = 'dissimilarity_plot_comp_pig.png')
+#ggsave(plot = last_plot(), file = 'dissimilarity_plot_comp_pig.png')
 
 

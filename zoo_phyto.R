@@ -28,9 +28,9 @@ master <- master_data %>%
 
 master$treatment = factor(as.factor(master$treatment), levels = c('con', 'F48', 'F36', 'F24', 'F12', 'F6'))
 phyto <- ggplot(subset(master, dummy == 'phytoplankton'), aes(x = day, y = mean,group = treatment_dummy))+
-  geom_point(aes(fill = treatment),size = 3, pch = 21, color = 'black')+
   geom_errorbar(aes(ymin = mean - se, ymax = mean + se), width = .5)+
   geom_line(linetype = 'dashed', aes(color = treatment))+
+  geom_point(aes(fill = treatment),size = 3, pch = 21, color = 'black')+
   labs(y = expression(Phytoplankton~C~'['~mu*mol*~L^-1~']'), x = ' ')+
   scale_fill_manual(values = c( '#000000','#0868ac','#41b6c4','#31a354','#addd8e','#fed976'))+
   scale_color_manual(values = c( '#000000','#0868ac','#41b6c4','#31a354','#addd8e','#fed976'))+
@@ -47,9 +47,9 @@ phyto
 #ggsave(plot = last_plot(), file = 'zoo_phyto.png', width = 8, height = 5)
 
 zoo <- ggplot(subset(master, dummy == 'zooplankton'), aes(x = day, y = mean,group = treatment_dummy))+
-  geom_point(aes(fill = treatment),size = 3, pch = 21, color = 'black')+
   geom_errorbar(aes(ymin = mean - se, ymax = mean + se), width = .5)+
   geom_line(linetype = 'dashed', aes(color = treatment))+
+  geom_point(aes(fill = treatment),size = 3, pch = 21, color = 'black')+
   labs(y = expression(Zooplankton~C~'['~mu*mol*~L^-1~']'), x = 'Time [days]')+
   scale_fill_manual(values = c( '#000000','#0868ac','#41b6c4','#31a354','#addd8e','#fed976'))+
   scale_color_manual(values = c( '#000000','#0868ac','#41b6c4','#31a354','#addd8e','#fed976'))+
@@ -65,8 +65,8 @@ zoo <- ggplot(subset(master, dummy == 'zooplankton'), aes(x = day, y = mean,grou
 zoo
 #ggsave(plot = zoo, file = 'zoo_carbon.png')
 library(cowplot)
-plot_grid(phyto, CN, CP, CSi, even, simpson, zoo, labels=c("(a)","(b)", '(c)', '(d)','(e)', '(f)', '(g)'),ncol = 2, label_size = 18, hjust = 0, vjust = 0.95)
-ggsave(plot = last_plot(), file = 'results.png', width = 12, height = 17)
+plot_grid(phyto, CN, CP, CSi,  zoo, labels=c("(a)","(b)", '(c)', '(d)','(e)', '(f)', '(g)'),ncol = 2, label_size = 18, hjust = 0, vjust = 0.95)
+#ggsave(plot = last_plot(), file = 'results.png', width = 9, height = 12)
 
 #############################################################
 nutri <- master_data %>%

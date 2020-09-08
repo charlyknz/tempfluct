@@ -237,7 +237,7 @@ shannon_BV[is.na(shannon_BV)] <- 0
 ##calculate shannon diversity index
 shannon_BV$shan = diversity(shannon_BV[, -c(1:4)], MARGIN = 1, index='shannon') #new column containing the calculated shannon index
 shannon_BV <- select(shannon_BV, treatment, sampling, fluctuation, MC, shan,everything() )
-shannon_BV$simpson = diversity(shannon_BV[, -c(1:5)], MARGIN = 1, index='simpson') #new column containing the calculated shannon index
+shannon_BV$simpson = diversity(shannon_BV[, -c(1:5)], MARGIN = 1, index='invsimpson') #new column containing the calculated shannon index
 shannon_BV <- select(shannon_BV, treatment, sampling, fluctuation, MC, shan, simpson,everything() )
 ## calculate species richness
 absence_presence <- decostand(shannon_BV[, -c(1:6)], method= 'pa', na.rm=T) #df giving absence/presence data using decostand function
@@ -267,3 +267,20 @@ ggplot(subset(diversity_BV, sampling == 10), aes(x = fluctuation, y = mean_index
   
 #ggsave(plot = last_plot(), file = 'shannon_div_BioV_time.png')  
 #####################################################################################
+
+#### STATS ####
+
+diversity <- shannon_BV %>%
+  ungroup() %>%
+  select(MC, fluctuation, sampling, evenness, no, shan,simpson) %>%
+  mutate(day = 2*sampling,
+         dayname = as.factor(day)) %>%
+  mutate(fluctuation = as.numeric(fluctuation),
+         interval = 48/fluctuation)
+diversity$interval[!is.finite(diversity$interval)] <- 0 
+even1 <- lmer(evenness ~ interval*day + (1|MC) + (1|dayname), data=diversity)
+summary(even1)
+anova(even1)  
+  
+  
+  

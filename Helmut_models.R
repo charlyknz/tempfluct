@@ -51,7 +51,7 @@ qqline(data1$c_umol_l)
 # Random: MC number
 #         dayname (categorical variable)
 
-mod1 <- lmer(c_umol_l ~ interval*day + (1|MC) + (1|dayname), data=data1)
+mod1 <- lmer(log(c_umol_l) ~ interval*day + (1|MC) + (1|dayname), data=data1)
 summary(mod1)
 anova(mod1)
 
@@ -183,9 +183,10 @@ str(dist_m)
 # Random: MC number
 #         dayname (categorical variable)
 
-bray1 <- lmer(distance ~ interval*day + (1|MC) + (1|dayname), data=dist_m)
+bray1 <- lmer(log(distance) ~ interval*day + (1|MC) + (1|dayname), data=dist_m)
 summary(bray1)
 anova(bray1)
+
 
 #plot residuals
 par(mfrow=c(2,2),cex.axis=1.2, cex.lab=1.5)
@@ -195,6 +196,14 @@ plot(fitted(bray1),resid(bray1),ylab="residuales")
 qqnorm(resid(bray1), main=""); 
 qqline(resid(bray1))
 
+
+dist_m %>%
+  group_by(Fluctuation, day) %>%
+  summarise(mean = mean(distance, na.rm = T)) %>%
+ggplot(., aes( x = day, y = mean, color = as.factor(Fluctuation), group = Fluctuation))+
+  geom_point(size = 3)+
+  geom_line()+
+  theme_classic()
 ###################################################################################
 
 ####pigment data ####
@@ -329,7 +338,7 @@ ratio$interval[!is.finite(ratio$interval)] <- 0
   
 
 #### Model
-CN1 <- lmer(CSi ~ interval*day + (1|MC) + (1|dayname), data=ratio)
+CN1 <- lmer(log(CP) ~ interval*day + (1|MC) + (1|dayname), data=ratio)
 summary(CN1)
 anova(CN1)
 

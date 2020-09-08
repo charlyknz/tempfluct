@@ -192,3 +192,175 @@ ggplot(subset(dist, fluctuation != 'control'), aes(x = sampling, y = mean, group
          text = element_text(size=12))
 #ggsave(plot = last_plot(), file = 'distance_treatment_to_control.png', width = 10, height = 6)
 
+
+
+############################# PCA ###############################################
+#### Data preparation #### 
+#### PCA2. Pigment data ####
+pigment <- read.csv2("~/Desktop/MA/MA_Rcode/project_data/master_pigments.csv", sep = ";", dec = ',')
+str(pigment)
+
+
+#bring data in form
+pigment_data <- pigment %>%
+  gather(key = 'pigments',value = 'value',-X, -no, -date,-treatment, -sampling, -planktotron )%>%
+  group_by(treatment,sampling, planktotron)%>%
+  mutate(sum = sum(value)) %>%
+  ungroup()%>%
+  spread(pigments, value ) %>%
+  mutate(rel_allo = Allo/sum)%>%
+  mutate(rel_anth = Anth/sum)%>% ###berechnung der relativen werte in neuer spalte nach Schlueter et al.
+  mutate(rel_bb.Car = bb.Car/sum)%>%
+  mutate(rel_cNeo = c.Neo/sum) %>%
+  mutate(rel_cantha = Cantha/sum)%>%
+  mutate(rel_chl.a = Chl.a/sum)%>%
+  mutate(rel_chl.b = Chl.b/sum)%>%
+  mutate(rel_chl.c1 = Chl.c1/sum)%>%
+  mutate(rel_chl.c2 = Chl.c2/sum)%>%
+  mutate(rel_diad = Diadino/sum)%>%
+  mutate(rel_diato = Dino/sum)%>%
+  mutate(rel_dino = Diato/sum)%>%
+  mutate(rel_echin = Echin/sum)%>%
+  mutate(rel_fuco = Fuco/sum)%>%
+  mutate(rel_lut = Lut/sum)%>%
+  mutate(rel_myxo = Myxo/sum)%>%
+  mutate(rel_peri = Peri/sum)%>%
+  mutate(rel_phe.a = Phe.a/sum)%>%
+  mutate(rel_viola = Viola/sum) %>%
+  mutate(rel_zea = Zea/sum)%>%
+  dplyr::select(-c("X","Allo", "Anth","bb.Car", "c.Neo", "Cantha","Chl.a","Chl.c1",
+                   "Chl.c2","Cryp","Diadino", "Diato","Dino","Echin","Lut","Myxo","Peri",       
+                   "Phe.a","Phe.b", "Viola", "Zea" , 'Fuco', 'Chl.b', 'date', 'no', 'sum')) %>%
+   mutate(fluctuation = paste(ifelse(treatment == 'control', 0, ifelse(treatment == 'Fluctuating_48', 48, ifelse(treatment == 'Fluctuating_36', 36,
+                                                                                                                ifelse(treatment == 'Fluctuating_24', 24, ifelse(treatment == 'Fluctuating_12', 12, 6)))))))
+#pigment_data$fluctuation <- factor(as.factor(pigment_data$fluctuation),levels=c("0", "48", "36", '24', '12', '6'))
+pigment_data$sampling = as.numeric(pigment_data$sampling)
+pigment_data[is.na(pigment_data)] <-0 #make sure we don't have NAs
+
+names(pigment_data)
+# 1. decide which variables are active, remove character variables and turn them into row names 
+pigment_data.active <- pigment_data %>% 
+  ungroup()%>%
+  dplyr::select(-treatment) %>% #remove columns which are not needed anymore
+  #filter(sampling %in% c(0,6,10,14,18)) %>% #use only data, which we have pigments and coutns
+  mutate( id = paste(fluctuation, planktotron, sampling, sep = '_')) %>% #create dummy column
+  dplyr::select(-fluctuation, -sampling, -planktotron) %>%
+  column_to_rownames("id")%>% #explanatory variables as row names
+  dplyr::select(-rel_bb.Car) #remove variable with only 0 entries
+
+
+#### perform PCA #### 
+prin_comp <- prcomp(pigment_data.active, scale. = T)
+names(prin_comp)
+
+# see how many dimensions we have
+dim(prin_comp$x)
+biplot(prin_comp, scale = 0)
+#[1] 30 30
+
+#2. The prcomp() function also provides the facility to compute standard deviation 
+#of each principal component. sdev refers to the standard deviation of principal components.
+
+#compute standard deviation of each principal component
+std_dev <- prin_comp$sdev
+
+#compute variance
+pr_var <- std_dev^2
+
+#check variance of first 10 components
+pr_var[1:10]
+
+#3. To compute the proportion of variance explained by each component, we simply divide the variance by sum of total variance. 
+#This results in:
+
+#proportion of variance explained
+prop_varex <- pr_var/sum(pr_var)
+prop_varex[1:6]
+plot(prop_varex, xlab = "Principal Component",
+     ylab = "Proportion of Variance Explained",
+     type = "b")
+
+#cumulative scree plot
+plot(cumsum(prop_varex), xlab = "Principal Component",
+     ylab = "Cumulative Proportion of Variance Explained",
+     type = "b")
+
+
+#### plot PC1 & 2 ####
+#PCA dataframe including our PC1:30 axes
+
+PCA <- prin_comp$x %>% 
+  as.data.frame %>%
+  rownames_to_column("fluctuation_MC_sampling") %>%
+  separate(fluctuation_MC_sampling,into = c("fluctuation", 'MC', 'sampling'),'_') %>%
+  dplyr::select(PC1, PC2, PC3, PC4, PC5, PC6, fluctuation, MC, sampling) 
+
+dist_p <- PCA %>%
+  mutate(id = paste(fluctuation, MC, sampling, sep ='_')) %>%
+  column_to_rownames('id')%>%
+  dplyr::select(-fluctuation,- MC,  -sampling)%>%
+  dist() %>%
+  broom::tidy() %>% 
+  separate(item1, c('fluctuation', 'MC','sampling'), '_')%>%
+  separate(item2, c('fluctuation2', 'MC2','sampling2'), '_') %>%
+  filter(fluctuation2 == '0' & fluctuation != '0')%>%
+  filter(sampling == sampling2) %>%
+  group_by(sampling, fluctuation)%>%
+  summarise(mean = mean(distance, na.rm =T),
+            sd = sd(distance, na.rm = T),
+            se = sd/sqrt(n()))
+dist_p$sampling =as.numeric(dist_p$sampling)
+dist_p <- arrange(dist_p, sampling)
+ggplot(subset(dist_p, fluctuation != '0'), aes(x = sampling, y = mean, group = fluctuation))+
+  geom_point(aes(fill = fluctuation), pch = 21, size = 3)+
+  geom_errorbar(aes(ymin = mean-se, ymax = mean+se), width = .8)+
+  geom_line(linetype = 'dashed', aes(col = fluctuation))+
+  scale_y_continuous(limits = c(0, 12), breaks = seq(0,12,3))+
+  scale_fill_manual(values = c('#0868ac','#41b6c4','#31a354','#addd8e','#fed976'))+
+  scale_color_manual(values = c('#0868ac','#41b6c4','#31a354','#addd8e','#fed976'))+
+  labs(x = 'sampling', y = 'Euclidian distance to control (based on PC 1:6)', title = 'dissimilarity of pigment diversity')+
+  theme( panel.background = element_rect(fill = NA), #loescht den Hintergrund meines Plots/ fuellt ihn mit nichts
+         #panel.grid.major.y = element_line(color='grey', linetype = 'dashed', size=0.2),
+         panel.border= element_rect(colour = "black", fill=NA, size=0.5),
+         strip.background = element_rect(color ='black', fill = 'white'),
+         strip.text = element_text(face = 'italic'),
+         legend.background = element_blank(),
+         legend.key = element_blank(),
+         text = element_text(size=12))
+#ggsave(plot = last_plot(), file = 'diss_pigment_diversity.png')
+
+
+#### STATS ####
+###
+dist_p <- PCA %>%
+  mutate(id = paste(fluctuation, MC, sampling, sep ='_')) %>%
+  column_to_rownames('id')%>%
+  dplyr::select(-fluctuation,- MC,  -sampling)%>%
+  dist() %>%
+  broom::tidy() %>% 
+  separate(item1, c('fluctuation', 'MC','sampling'), '_')%>%
+  separate(item2, c('fluctuation2', 'MC2','sampling2'), '_') %>%
+  filter(fluctuation2 == '0' & fluctuation != '0')%>%
+  filter(sampling == sampling2) %>%
+  group_by(sampling, fluctuation, MC)%>%
+  summarise(mean = mean(distance, na.rm =T),
+            sd = sd(distance, na.rm = T),
+            se = sd/sqrt(n())) %>%
+  ungroup() %>%
+  mutate(sampling =as.numeric(sampling),
+         day = 2*sampling) %>%
+  mutate(dayname = as.factor(day)) %>%
+  mutate(fluctuation = as.numeric(fluctuation),
+         interval = 48/fluctuation)
+dist_p$interval[!is.finite(dist_p$interval)] <- 0 
+str(dist_p)
+dist_p <- arrange(dist_p, sampling)
+#model 
+# Response variable: bray distance for each MC compared to T0
+# Explanatory variables: interval (fluctuation interval in 48 h) + time
+# Random: MC number
+#         dayname (categorical variable)
+
+bray1 <- lmer(mean ~ interval*day + (1|MC) + (1|dayname), data=dist_p)
+summary(bray1)
+anova(bray1)
