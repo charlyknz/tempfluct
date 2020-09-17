@@ -250,21 +250,61 @@ diversity_BV <- shannon_BV %>%
   select(MC, fluctuation, sampling, evenness, no, shan,simpson) %>%
   gather(key = 'index', value = 'value', -sampling, -fluctuation, -MC) %>%
   group_by(fluctuation, sampling, index) %>%
-  mutate(mean_index = mean(value, na.rm = T),
+  summarise(mean_index = mean(value, na.rm = T),
          sd = sd(value, na.rm =T),
-         se = sd/ sqrt(n()))
+         se = sd/ sqrt(n()),
+         n = n()) %>%
+  mutate(lower.ci.mpg = mean_index - 1.96*se/sqrt(n),
+         upper.ci.mpg = mean_index + 1.96*se/sqrt(n),
+         day = sampling *2)
 
 diversity_BV$fluctuation <- factor(as.factor(diversity_BV$fluctuation),levels=c("0", "48", "36", '24', '12', '6'))
-ggplot(subset(diversity_BV, sampling == 10), aes(x = fluctuation, y = mean_index)) +
-  geom_line(linetype = 'dashed', size = 0.5)+
-  geom_point(aes(fill = fluctuation), pch = 21,size= 3,col = '#000000')+
-  geom_errorbar(aes(ymin = mean_index - se, ymax = mean_index + se), width = .5)+
+even_p <- ggplot(subset(diversity_BV, index == 'evenness'), aes(x = day, y = mean_index, group = fluctuation)) +
+  geom_line(linetype = 'dashed', size = 0.5, aes(col = fluctuation))+
+  geom_errorbar(aes(ymin = lower.ci.mpg , ymax = upper.ci.mpg, col = fluctuation), width = .5, position = position_dodge(width = .9))+
+  geom_point(aes(fill = fluctuation), pch = 21,size= 3,col = '#000000', position = position_dodge(width = .9))+
  # scale_x_continuous(limits = c(-1, 20), breaks = seq(0,18,2))+
   scale_fill_manual(values = c( '#000000','#0868ac','#41b6c4','#31a354','#addd8e','#fed976'))+
-  labs(x = 'Fluctuation frequency (in h)', y = 'shannon diversity', fill = 'Fluctuation')+
-  theme_bw()+
-  facet_wrap(~index, scales = 'free_y')
-  
+  scale_color_manual(values = c( '#000000','#0868ac','#41b6c4','#31a354','#addd8e','#fed976'))+
+  labs(x = '', y= 'Evenness species composition', fill = 'Fluctuation  \nfrequency [h]', col = 'Fluctuation  \nfrequency [h]')+
+  theme(panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        strip.background = element_blank(),legend.position = 'none', 
+        panel.background = element_rect(fill = NA), #loescht den Hintergrund meines Plots/ fuellt ihn mit nichts
+        #panel.grid.major.y = element_line(color='grey', linetype = 'dashed', size=0.2),
+        panel.border= element_rect(colour = "black", fill=NA, size=1),
+        strip.text = element_text(face = 'bold'),
+        legend.background = element_blank(),
+        legend.key = element_blank(),
+        text = element_text(size=17))
+even_p
+
+even_no <- ggplot(subset(diversity_BV, index == 'no'), aes(x = day, y = mean_index, group = fluctuation)) +
+  geom_line(linetype = 'dashed', size = 0.5, aes(col = fluctuation))+
+  geom_errorbar(aes(ymin = lower.ci.mpg , ymax = upper.ci.mpg, col = fluctuation), width = .5, position = position_dodge(width = .9))+
+  geom_point(aes(fill = fluctuation), pch = 21,size= 3,col = '#000000', position = position_dodge(width = .9))+
+  # scale_x_continuous(limits = c(-1, 20), breaks = seq(0,18,2))+
+  scale_fill_manual(values = c( '#000000','#0868ac','#41b6c4','#31a354','#addd8e','#fed976'))+
+  scale_color_manual(values = c( '#000000','#0868ac','#41b6c4','#31a354','#addd8e','#fed976'))+
+  labs(x = 'Time [days]', y= 'Species richness', fill = 'Fluctuation  \nfrequency [h]', col = 'Fluctuation  \nfrequency [h]')+
+  theme(panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        strip.background = element_blank(),legend.position = 'none', 
+        panel.background = element_rect(fill = NA), #loescht den Hintergrund meines Plots/ fuellt ihn mit nichts
+        #panel.grid.major.y = element_line(color='grey', linetype = 'dashed', size=0.2),
+        panel.border= element_rect(colour = "black", fill=NA, size=1),
+        strip.text = element_text(face = 'bold'),
+        legend.background = element_blank(),
+        legend.key = element_blank(),
+        text = element_text(size=17))
+even_no
+
+library(cowplot)
+plot_grid(even_p, even_no,  labels=c("(a)","(b)"),ncol = 2, label_size = 18, hjust = 0, vjust = 0.95)
+#ggsave(plot = last_plot(), file = 'even_no_specBV.png', width = 9, height = 5)
+
+
+
 #ggsave(plot = last_plot(), file = 'shannon_div_BioV_time.png')  
 #####################################################################################
 

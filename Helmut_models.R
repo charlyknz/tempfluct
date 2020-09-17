@@ -328,7 +328,7 @@ ratio <- nutrients_master %>%
          NSi = nitrate_umol_l/SiP_micromol_l,
          SiP = SiP_micromol_l/POP_micromol_l) %>%
   dplyr::select(nitrate_umol_l,fluctuation, sampling, planktotron,SiP_micromol_l,CN, NP, CP, CSi, NSi, NSi, SiP)%>%
-  rename( MC = planktotron) %>%
+  dplyr::rename( MC = planktotron) %>%
   mutate(day = 2* sampling, 
          dayname = as.factor(day),
          MC = as.character(MC)) %>%
@@ -338,7 +338,7 @@ ratio$interval[!is.finite(ratio$interval)] <- 0
   
 
 #### Model
-CN1 <- lmer(log(CP) ~ interval*day + (1|MC) + (1|dayname), data=ratio)
+CN1 <- lmer(log(CSi) ~ interval*day + (1|MC) + (1|dayname), data=ratio)
 summary(CN1)
 anova(CN1)
 
@@ -367,14 +367,14 @@ qqline(resid(CN1))
 #### RUE ####
 RUE <- nutrients_master %>%
   dplyr::select(fluctuation, planktotron, sampling, carbon_umol_l, nitrate_umol_l, POP_micromol_l, 'diss_Nitrat+Nitrit_umol_l', 'diss_Phosphat_umol_l') %>%
-  rename(diss_P = 'diss_Phosphat_umol_l',
+  dplyr::rename(diss_P = 'diss_Phosphat_umol_l',
          diss_N = 'diss_Nitrat+Nitrit_umol_l') %>%
   mutate(TP = diss_P + POP_micromol_l,
          TN = diss_N + nitrate_umol_l) %>%
   drop_na(carbon_umol_l) %>%
   mutate(P_RUE = carbon_umol_l/ TP,
          N_RUE = carbon_umol_l/ TN) %>%
-  rename( MC = planktotron) %>%
+  dplyr::rename( MC = planktotron) %>%
   mutate(day = 2* sampling, 
          dayname = as.factor(day),
          MC = as.character(MC),

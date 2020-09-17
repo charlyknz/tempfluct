@@ -39,7 +39,13 @@ ratio <- nutrients_master %>%
          sd = sd(log, na.rm = T),
          se = sd/sqrt(n())) %>%
   drop_na(mean) %>%
-  mutate(day = sampling *2)
+  mutate(day = sampling *2) %>%
+  mutate(lower.ci = mean - 1.96*se/sqrt(n()),
+         upper.ci = mean + 1.96*se/sqrt(n()),
+         trans = 10^mean, 
+         ci_l = 10^lower.ci,
+         ci_u = 10^upper.ci) #create new column named trans_pred with transformed predictions.
+  
 ratio$fluctuation <- factor(as.factor(ratio$fluctuation),levels=c("0", "48", "36", '24', '12', '6'))
 
 ggplot(ratio, aes( x = day, y = mean))+
@@ -64,7 +70,7 @@ ggplot(ratio, aes( x = day, y = mean))+
 ## use molar values
 RUE12 <- nutrients_master %>%
   dplyr::select(fluctuation, planktotron, sampling, srp_micromol_l, carbon_umol_l, nitrate_umol_l, POP_micromol_l, 'diss_Nitrat+Nitrit_umol_l', 'diss_Phosphat_umol_l') %>%
-  rename(diss_P = 'diss_Phosphat_umol_l',
+  dplyr::rename(diss_P = 'diss_Phosphat_umol_l',
          diss_N = 'diss_Nitrat+Nitrit_umol_l') %>%
   mutate(TP = diss_P + POP_micromol_l,
          TN = diss_N + nitrate_umol_l) %>%
@@ -72,52 +78,28 @@ RUE12 <- nutrients_master %>%
   mutate(P_RUE = carbon_umol_l/ TP,
          N_RUE = carbon_umol_l/ TN) %>%
   gather(key = 'nutrient', value = 'value', -fluctuation, -sampling, -planktotron) %>%
-  group_by(fluctuation, sampling, nutrient) %>%
-  summarise(mean_N = mean(value, na.rm = T),
+  dplyr::group_by(fluctuation, sampling, nutrient) %>%
+  dplyr::summarise(mean_N = mean(value, na.rm = T),
             sd_N = sd(value, na.rm = T),
-            se_N = sd_N/sqrt(n())) %>%
+            n = dplyr::n(),
+            se_N = sd_N/sqrt(n)) %>%
+  mutate(lower.ci = mean_N - 1.96*se_N/sqrt(n),
+         upper.ci = mean_N + 1.96*se_N/sqrt(n)) %>%
   filter(mean_N > 0)%>%
   mutate(day = sampling *2)
 
-## ug values and chlorohyll values
-RUE <- nutrients_master %>%
-  dplyr::select(fluctuation, planktotron, sampling, Chl.a_microg_l, n_ug_l, POP_microg_l, 'diss_Nitrat+Nitrit_ug_l', 'diss_Phosphat_ug_l') %>%
-  rename(diss_P_ug = 'diss_Phosphat_ug_l',
-         diss_N_ug = 'diss_Nitrat+Nitrit_ug_l') %>%
-  mutate(TP = diss_P_ug + POP_microg_l,
-         TN = diss_N_ug + n_ug_l) %>%
-  drop_na(Chl.a_microg_l) %>%
-  mutate(P_RUE = Chl.a_microg_l/ TP,
-         N_RUE = Chl.a_microg_l/ TN) %>%
-  gather(key = 'nutrient', value = 'value', -fluctuation, -sampling, -planktotron) %>%
-  group_by(fluctuation, sampling, nutrient) %>%
-  summarise(mean_N = mean(value, na.rm = T),
-            sd_N = sd(value, na.rm = T),
-            se_N = sd_N/sqrt(n())) %>%
-  filter(mean_N > 0) %>%
-  mutate(day = sampling *2)
-
-
 RUE12$fluctuation <- factor(as.factor(RUE12$fluctuation),levels=c("0", "48", "36", '24', '12', '6'))
-RUE$fluctuation <- factor(as.factor(RUE$fluctuation),levels=c("0", "48", "36", '24', '12', '6'))
-ggplot(RUE, aes(x = sampling, y = mean_N))+
-  geom_line(linetype = 'dashed', aes(col = fluctuation))+
-  geom_errorbar(aes(ymin = mean_N -se_N, ymax =  mean_N +se_N))+
-  geom_point(aes(fill = fluctuation), pch = 21, col = 'black', size = 3)+
-  scale_fill_manual(values = c( '#000000','#0868ac','#41b6c4','#31a354','#addd8e','#fed976'))+
-  scale_color_manual(values = c( '#000000','#0868ac','#41b6c4','#31a354','#addd8e','#fed976'))+
-  labs(x = 'time (in days)', y = 'mean Molar ratio')+
-  facet_wrap(~nutrient, scales = 'free_y')
-#ggsave(plot = last_plot(), file = 'RUE_chl.png')
+
 
 ##########################################################
 RUE_N <- ggplot(subset(RUE12, nutrient == 'N_RUE'), aes(x = day, y = mean_N))+
   geom_line(linetype = 'dashed', aes(col = fluctuation))+
-  geom_errorbar(aes(ymin = mean_N -se_N, ymax =  mean_N +se_N), width = .5)+
-  geom_point(aes(fill = fluctuation), pch = 21, col = 'black', size = 3)+
+ # geom_errorbar(aes(ymin = mean_N -se_N, ymax =  mean_N +se_N), width = .5)+
+  geom_errorbar(aes(ymin = lower.ci, ymax = upper.ci, color = fluctuation), width = .5,position = position_dodge2(width = .5))+
+  geom_point(aes(fill = fluctuation), pch = 21, col = 'black', size = 3,position = position_dodge2(width = .5))+
   scale_fill_manual(values = c( '#000000','#0868ac','#41b6c4','#31a354','#addd8e','#fed976'))+
   scale_color_manual(values = c( '#000000','#0868ac','#41b6c4','#31a354','#addd8e','#fed976'))+
-  labs(x = 'Time (in days)', y = 'RUE (Total N)')+
+  labs(x = 'Time [days]', y = 'RUE (Total N)')+
   #facet_wrap(~nutrient, scales = 'free_y')+
   theme( panel.background = element_rect(fill = NA), #loescht den Hintergrund meines Plots/ fuellt ihn mit nichts
          #panel.grid.major.y = element_line(color='grey', linetype = 'dashed', size=0.2),
@@ -133,11 +115,12 @@ RUE_N
 
 RUE_P <- ggplot(subset(RUE12, nutrient == 'P_RUE'), aes(x = day, y = mean_N))+
   geom_line(linetype = 'dashed', aes(col = fluctuation))+
-  geom_errorbar(aes(ymin = mean_N -se_N, ymax =  mean_N +se_N), width = .5)+
-  geom_point(aes(fill = fluctuation), pch = 21, col = 'black', size = 3)+
+  #geom_errorbar(aes(ymin = mean_N -se_N, ymax =  mean_N +se_N), width = .5,position = position_dodge2(width = .5))+
+  geom_errorbar(aes(ymin = lower.ci, ymax = upper.ci, color = fluctuation), width = .5,position = position_dodge2(width = .5))+
+  geom_point(aes(fill = fluctuation), pch = 21, col = 'black', size = 3,position = position_dodge2(width = .5))+
   scale_fill_manual(values = c( '#000000','#0868ac','#41b6c4','#31a354','#addd8e','#fed976'))+
   scale_color_manual(values = c( '#000000','#0868ac','#41b6c4','#31a354','#addd8e','#fed976'))+
-  labs(x = 'Time (in days)', y = 'RUE (Total P)')+
+  labs(x = 'Time [days]', y = 'RUE (Total P)')+
   #facet_wrap(~nutrient, scales = 'free_y')+
   theme( panel.background = element_rect(fill = NA), #loescht den Hintergrund meines Plots/ fuellt ihn mit nichts
          #panel.grid.major.y = element_line(color='grey', linetype = 'dashed', size=0.2),
@@ -150,16 +133,14 @@ RUE_P <- ggplot(subset(RUE12, nutrient == 'P_RUE'), aes(x = day, y = mean_N))+
          text = element_text(size=18))
 RUE_P
 
-plot_grid(RUE_N, RUE_P, labels=c("(a)","(b)"),ncol = 2, label_size = 18, hjust = 0, vjust = 1)
-#ggsave(plot = last_plot(), file = 'RUE.png', width = 9, height = 5)
 
-CN <- ggplot(subset(ratio, ratio == 'CN') , aes( x = day, y = mean))+
+CN <- ggplot(subset(ratio, ratio == 'CN') , aes( x = day, y = trans))+
   geom_line(linetype = 'dashed' , aes(col = fluctuation,  group = fluctuation))+
-  geom_errorbar(aes(ymin = mean -se, ymax = mean + se ), width = .5)+
-  geom_point(aes(fill = fluctuation), pch = 21, size = 3, col = 'black')+
+  geom_errorbar(aes(ymin = ci_l, ymax = ci_u , color = fluctuation), width = .5,position = position_dodge2(width = .5))+
+  geom_point(aes(fill = fluctuation), pch = 21, size = 3, col = 'black',position = position_dodge2(width = .5))+
   scale_fill_manual(values = c( '#000000','#0868ac','#41b6c4','#31a354','#addd8e','#fed976'))+
   scale_color_manual(values = c( '#000000','#0868ac','#41b6c4','#31a354','#addd8e','#fed976'))+
-  labs(x = ' ', y = 'Log C:N ratio')+
+  labs(x = ' ', y = 'C:N ratio (log)')+
   theme( panel.background = element_rect(fill = NA), #loescht den Hintergrund meines Plots/ fuellt ihn mit nichts
          #panel.grid.major.y = element_line(color='grey', linetype = 'dashed', size=0.2),
          panel.border= element_rect(colour = "black", fill=NA, size=1),
@@ -171,13 +152,13 @@ CN <- ggplot(subset(ratio, ratio == 'CN') , aes( x = day, y = mean))+
          text = element_text(size=18))
 CN
 
-CP <- ggplot(subset(ratio, ratio == 'CP') , aes( x = day, y = mean))+
+CP <- ggplot(subset(ratio, ratio == 'CP') , aes( x = day, y = trans))+
   geom_line(linetype = 'dashed' , aes(col = fluctuation,  group = fluctuation))+
-  geom_errorbar(aes(ymin = mean -se, ymax = mean + se ), width = .5)+
-  geom_point(aes(fill = fluctuation), pch = 21, size = 3, col = 'black')+
+  geom_errorbar(aes(ymin = ci_l, ymax = ci_u, col = fluctuation), width = .5,position = position_dodge2(width = .5))+
+  geom_point(aes(fill = fluctuation), pch = 21, size = 3, col = 'black',position = position_dodge2(width = .5))+
   scale_fill_manual(values = c( '#000000','#0868ac','#41b6c4','#31a354','#addd8e','#fed976'))+
   scale_color_manual(values = c( '#000000','#0868ac','#41b6c4','#31a354','#addd8e','#fed976'))+
-  labs(x = '', y = 'Log C:P ratio')+
+  labs(x = 'Time [days]', y = 'C:P ratio (log)')+
   theme( panel.background = element_rect(fill = NA), #loescht den Hintergrund meines Plots/ fuellt ihn mit nichts
          #panel.grid.major.y = element_line(color='grey', linetype = 'dashed', size=0.2),
          panel.border= element_rect(colour = "black", fill=NA, size=1),
@@ -189,13 +170,13 @@ CP <- ggplot(subset(ratio, ratio == 'CP') , aes( x = day, y = mean))+
          text = element_text(size=18))
 CP
 
-CSi <- ggplot(subset(ratio, ratio == 'CSi') , aes( x = day, y = mean))+
+CSi <- ggplot(subset(ratio, ratio == 'CSi') , aes( x = day, y = trans))+
   geom_line(linetype = 'dashed' , aes(col = fluctuation,  group = fluctuation))+
-  geom_errorbar(aes(ymin = mean -se, ymax = mean + se ), width = .5)+
-  geom_point(aes(fill = fluctuation), pch = 21, size = 3, col = 'black')+
+  geom_errorbar(aes(ymin = ci_l, ymax = ci_u, col = fluctuation), width = .5,position = position_dodge2(width = .5))+
+  geom_point(aes(fill = fluctuation), pch = 21, size = 3, col = 'black',position = position_dodge2(width = .5))+
   scale_fill_manual(values = c( '#000000','#0868ac','#41b6c4','#31a354','#addd8e','#fed976'))+
   scale_color_manual(values = c( '#000000','#0868ac','#41b6c4','#31a354','#addd8e','#fed976'))+
-  labs(x = 'Time [days]', y = 'Log C:Si ratio', color = 'Fluctuation frequency (in h)',fill = 'Fluctuation frequency (in h)')+
+  labs(x = 'Time [days]', y = 'C:Si ratio (log)', color = 'Fluctuation frequency (in h)',fill = 'Fluctuation frequency (in h)')+
   theme( panel.background = element_rect(fill = NA), #loescht den Hintergrund meines Plots/ fuellt ihn mit nichts
          #panel.grid.major.y = element_line(color='grey', linetype = 'dashed', size=0.2),
          panel.border= element_rect(colour = "black", fill=NA, size=1),
@@ -206,4 +187,6 @@ CSi <- ggplot(subset(ratio, ratio == 'CSi') , aes( x = day, y = mean))+
          legend.key = element_blank(),
          text = element_text(size=18))
 CSi
-#ggsave(plot = CSi, file = 'CarbonSi_ratio.png')
+plot_grid(CN, CP,CSi, labels=c("(a)","(b)", '(c)'),ncol = 2, label_size = 18, hjust = 0, vjust = 1)
+
+#ggsave(plot = last_plot(), file = 'MolarRatio.png', width = 9, height = 7)

@@ -1,11 +1,13 @@
 ##
 # R Skript to analyse pigment composition
 library(tidyverse)
+library(vegan)
+library(cowplot)
 ## load data
 
 ##import master data
 data <- read.csv2("~/Desktop/MA/MA_Rcode/project_data/master_pigments.csv", sep = ";", dec = ',')
-
+names(data)
 pig_data <- data %>%
   gather(key = 'pigments',value = 'value',-X, -no, -date,-treatment, -sampling, -planktotron )%>%
   group_by(treatment,sampling, planktotron)%>%
@@ -54,13 +56,7 @@ ggplot(., aes(x = sampling, y = mean, col = treatment, group = treatment))+
   theme_bw()
 #ggsave(plot = last_plot(), file = 'mean_pigments.png')
 #
-pig_data%>%
-  filter(sampling <11)%>%
-  ggplot(aes(x = sampling, y = value, fill = pigment))+
-  geom_bar(stat = 'identity')+
-  labs(x = 'sampling', y = 'relative_contribution')+
-  facet_wrap(~treatment)+
-  theme_bw()
+
 
 pig_data%>%
   filter(sampling %in% c(0,6,10,14,18))%>%
@@ -132,6 +128,7 @@ modell_dat <- data_diversity %>%
          dayname = as.factor(day)) %>%
   mutate(fluctuation = as.numeric(fluctuation),
          interval = 48/fluctuation)
+
 modell_dat$interval[is.na(modell_dat$interval)] <-0
 modell_dat$fluctuation[is.na(modell_dat$fluctuation)] <-0
 div <- lmer(evenness ~ interval*day + (1|planktotron) + (1|dayname), data=modell_dat)
@@ -142,21 +139,27 @@ anova(div)
 data_plot  <- data_diversity %>%
   select(sampling, treatment,planktotron,shannon, evenness, rich, simpson) %>%
   gather(key = 'index', value = 'value', -treatment, -sampling, -planktotron) %>%
-  group_by(sampling, treatment, index) %>%
-  summarise(mean_index = mean(value, na.rm = T),
-            sd_index = sd(value, na.rm = T),
-            se_index = sd_index/sqrt(n())) %>%
+  dplyr::group_by(sampling, treatment, index) %>%
+  dplyr::summarise(mean_index = mean(value, na.rm = T),
+            sd.mpg = sd(value, na.rm = T),
+            n.mpg = dplyr::n()) %>%
+  mutate(se_index = sd.mpg/sqrt(n.mpg),
+         lower.ci.mpg = mean_index - 1.96*se_index/sqrt(n.mpg),
+         upper.ci.mpg = mean_index + 1.96*se_index/sqrt(n.mpg)) %>%
   separate(treatment, into = c('mist', 'fluctuation'), '_') %>%
-  mutate(day = sampling *2)
-data_plot$fluctuation[is.na(data_plot$fluctuation)] <- 0
+  mutate(day = sampling *2) %>%
+  group_by(mean_index) %>%
+  mutate(width = 0.5 * n())
+  data_plot$fluctuation[is.na(data_plot$fluctuation)] <- 0
 
 #plot
 data_plot$fluctuation <- factor(as.factor(data_plot$fluctuation),levels=c("0", "48", "36", '24', '12', '6'))
 
 simpson <- ggplot(subset(data_plot, index %in% c('simpson')), aes(x =day, y = mean_index))+
   geom_line(linetype = 'dashed', size = 0.5, aes(color = fluctuation))+
-  geom_point(aes(fill = fluctuation), pch=21, size=3, col = '#000000')+
-  geom_errorbar(aes(ymin = mean_index - se_index, ymax = mean_index+se_index), width = .5)+
+  #geom_errorbar(aes(ymin = mean_index - se_index, ymax = mean_index+se_index, color = fluctuation), width = .5)+
+  geom_errorbar(aes(ymin = lower.ci.mpg, ymax = upper.ci.mpg, color = fluctuation),position = position_dodge(width = .9),width = .6, size=.5)+
+  geom_point(aes(fill = fluctuation), pch=21, size=3, col = '#000000', position = position_dodge(width = .9))+
   scale_fill_manual(values = c( '#000000','#0868ac','#41b6c4','#31a354','#addd8e','#fed976'))+
   scale_color_manual(values = c( '#000000','#0868ac','#41b6c4','#31a354','#addd8e','#fed976'))+
   labs(x = 'Time [days]', y= 'simpson index of pigment diversity', fill = 'Fluctuation  \nfrequency [h]', col = 'Fluctuation  \nfrequency [h]')+
@@ -176,8 +179,9 @@ simpson
 
 even <- ggplot(subset(data_plot, index %in% c('evenness')), aes(x =day, y = mean_index))+
   geom_line(linetype = 'dashed', size = 0.5, aes(color = fluctuation))+
-  geom_point(aes(fill = fluctuation), pch=21, size=3, col = '#000000')+
-  geom_errorbar(aes(ymin = mean_index - se_index, ymax = mean_index+se_index), width = .5)+
+ # geom_errorbar(aes(ymin = mean_index - se_index, ymax = mean_index+se_index), width = .5)+
+  geom_errorbar(aes(ymin = lower.ci.mpg, ymax = upper.ci.mpg, color = fluctuation), width = .6,position = position_dodge2(width = .6))+
+  geom_point(aes(fill = fluctuation), pch=21, size=3, col = '#000000',position = position_dodge2(width = .6))+
   scale_fill_manual(values = c( '#000000','#0868ac','#41b6c4','#31a354','#addd8e','#fed976'))+
   scale_color_manual(values = c( '#000000','#0868ac','#41b6c4','#31a354','#addd8e','#fed976'))+
   labs(x = ' ', y= 'evenness of pigment diversity', fill = 'Fluctuation  \nfrequency [h]', col = 'Fluctuation  \nfrequency [h]')+
@@ -193,3 +197,13 @@ even <- ggplot(subset(data_plot, index %in% c('evenness')), aes(x =day, y = mean
         legend.key = element_blank(),
         text = element_text(size=17))#
 even 
+
+plot_grid(even, simpson,  labels=c("(a)","(b)"),ncol = 1, label_size = 18, hjust = 0, vjust = 0.95)
+#ggsave(plot = last_plot(), file = 'pigments.png', width = 9, height = 9)
+
+#######
+
+ci <- data_plot %>%
+  dplyr::select(day, fluctuation, index, mean_index, lower.ci.mpg, upper.ci.mpg) %>%
+  arrange(index, day)
+#write.csv2(x = ci, file = 'ci_pigments.csv')

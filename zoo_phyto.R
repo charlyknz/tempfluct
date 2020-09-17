@@ -1,10 +1,12 @@
+## 
+library(tidyverse)
 ## zoo and phyto data in one plot
 #import all data
 
 Mastertable <- read_delim("~/Desktop/MA/MA_Rcode/project_data/Mastertable.csv", 
                           ";", escape_double = FALSE, locale = locale(decimal_mark = ","), 
                           trim_ws = TRUE) %>%
-  rename(MC = planktotron)
+  dplyr::rename(MC = planktotron)
 str(Mastertable)
 
 ## merge with treatment information
@@ -15,22 +17,26 @@ master_data <- left_join(Mastertable, treatments, by = c('MC'))
 
   
 master <- master_data %>%
-  select(MC, sampling, treatment, fluctuation, carbon_umol_l, C_Zoo_µmol_l ) %>%
+  dplyr::select(MC, sampling, treatment, fluctuation, carbon_umol_l, C_Zoo_µmol_l ) %>%
   gather(key = 'variable', value = 'carbon', -MC, -sampling, -treatment, -fluctuation, ) %>%
   mutate(dummy = paste(ifelse(variable == 'carbon_umol_l', 'phytoplankton', 'zooplankton'))) %>%
-  group_by(sampling, treatment, fluctuation, dummy) %>%
-  summarise(mean = mean(carbon, na.rm = T),
+  dplyr::group_by(sampling, treatment, fluctuation, dummy) %>%
+  dplyr::summarise(mean = mean(carbon, na.rm = T),
             sd = sd(carbon, na.rm = T),
-            se = sd/sqrt(n())) %>%
+            n = dplyr::n(),
+            se = sd/sqrt(n) )%>%
+  mutate(lower.ci = mean - 1.96*se/sqrt(n),
+         upper.ci = mean + 1.96*se/sqrt(n)) %>%
   mutate(treatment_dummy = paste(treatment, dummy, sep = '_')) %>%
   drop_na(mean) %>%
   mutate(day = sampling *2)
 
 master$treatment = factor(as.factor(master$treatment), levels = c('con', 'F48', 'F36', 'F24', 'F12', 'F6'))
 phyto <- ggplot(subset(master, dummy == 'phytoplankton'), aes(x = day, y = mean,group = treatment_dummy))+
-  geom_errorbar(aes(ymin = mean - se, ymax = mean + se), width = .5)+
+  #geom_errorbar(aes(ymin = mean - se, ymax = mean + se), width = .5)+
+  geom_errorbar(aes(ymin = lower.ci, ymax = upper.ci, color = treatment), width = .5, position = position_dodge2(width = .5))+
   geom_line(linetype = 'dashed', aes(color = treatment))+
-  geom_point(aes(fill = treatment),size = 3, pch = 21, color = 'black')+
+  geom_point(aes(fill = treatment),size = 3, pch = 21, color = 'black', position = position_dodge2(width = .5))+
   labs(y = expression(Phytoplankton~C~'['~mu*mol*~L^-1~']'), x = ' ')+
   scale_fill_manual(values = c( '#000000','#0868ac','#41b6c4','#31a354','#addd8e','#fed976'))+
   scale_color_manual(values = c( '#000000','#0868ac','#41b6c4','#31a354','#addd8e','#fed976'))+
@@ -47,10 +53,11 @@ phyto
 #ggsave(plot = last_plot(), file = 'zoo_phyto.png', width = 8, height = 5)
 
 zoo <- ggplot(subset(master, dummy == 'zooplankton'), aes(x = day, y = mean,group = treatment_dummy))+
-  geom_errorbar(aes(ymin = mean - se, ymax = mean + se), width = .5)+
-  geom_line(linetype = 'dashed', aes(color = treatment))+
-  geom_point(aes(fill = treatment),size = 3, pch = 21, color = 'black')+
-  labs(y = expression(Zooplankton~C~'['~mu*mol*~L^-1~']'), x = 'Time [days]')+
+ # geom_errorbar(aes(ymin = mean - se, ymax = mean + se), width = .5)+
+  geom_errorbar(aes(ymin = lower.ci, ymax = upper.ci, color = treatment), width = .5,position = position_dodge2(width = .5))+
+ geom_line(linetype = 'dashed', aes(color = treatment))+
+  geom_point(aes(fill = treatment),size = 3, pch = 21, color = 'black',position = position_dodge2(width = .5))+
+  labs(y = expression(Zooplankton~C~'['~mu*mol*~L^-1~']'), x = ' ')+
   scale_fill_manual(values = c( '#000000','#0868ac','#41b6c4','#31a354','#addd8e','#fed976'))+
   scale_color_manual(values = c( '#000000','#0868ac','#41b6c4','#31a354','#addd8e','#fed976'))+
   theme( panel.background = element_rect(fill = NA), #loescht den Hintergrund meines Plots/ fuellt ihn mit nichts
@@ -65,8 +72,8 @@ zoo <- ggplot(subset(master, dummy == 'zooplankton'), aes(x = day, y = mean,grou
 zoo
 #ggsave(plot = zoo, file = 'zoo_carbon.png')
 library(cowplot)
-plot_grid(phyto, CN, CP, CSi,  zoo, labels=c("(a)","(b)", '(c)', '(d)','(e)', '(f)', '(g)'),ncol = 2, label_size = 18, hjust = 0, vjust = 0.95)
-#ggsave(plot = last_plot(), file = 'results.png', width = 9, height = 12)
+plot_grid(phyto, zoo, RUE_N, RUE_P,  labels=c("(a)","(b)", '(c)', '(d)','(e)', '(f)', '(g)'),ncol = 2, label_size = 18, hjust = 0, vjust = 0.95)
+#ggsave(plot = last_plot(), file = 'results.png', width = 9, height = 9)
 
 #############################################################
 nutri <- master_data %>%
