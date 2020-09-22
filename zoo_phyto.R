@@ -32,14 +32,15 @@ master <- master_data %>%
   mutate(day = sampling *2)
 
 master$treatment = factor(as.factor(master$treatment), levels = c('con', 'F48', 'F36', 'F24', 'F12', 'F6'))
-phyto <- ggplot(subset(master, dummy == 'phytoplankton'), aes(x = day, y = mean,group = treatment_dummy))+
+phyto <- ggplot(subset(master, dummy == 'phytoplankton' & treatment %in% c('con', 'F48', 'F36', 'F24', 'F12', 'F6')), aes(x = day, y = mean,group = treatment_dummy))+
   #geom_errorbar(aes(ymin = mean - se, ymax = mean + se), width = .5)+
   geom_errorbar(aes(ymin = lower.ci, ymax = upper.ci, color = treatment), width = .5, position = position_dodge2(width = .5))+
   geom_line(linetype = 'dashed', aes(color = treatment))+
   geom_point(aes(fill = treatment),size = 3, pch = 21, color = 'black', position = position_dodge2(width = .5))+
-  labs(y = expression(Phytoplankton~C~'['~mu*mol*~L^-1~']'), x = ' ')+
+  labs(y = expression(Phytoplankton~C~'['~mu*mol*~L^-1~']'), x = 'Time [days]')+
   scale_fill_manual(values = c( '#000000','#0868ac','#41b6c4','#31a354','#addd8e','#fed976'))+
   scale_color_manual(values = c( '#000000','#0868ac','#41b6c4','#31a354','#addd8e','#fed976'))+
+  scale_y_continuous(limits = c(100, 300), breaks = seq(100, 300, 50))+
   theme( panel.background = element_rect(fill = NA), #loescht den Hintergrund meines Plots/ fuellt ihn mit nichts
          #panel.grid.major.y = element_line(color='grey', linetype = 'dashed', size=0.2),
          panel.border= element_rect(colour = "black", fill=NA, size=1),
@@ -50,7 +51,7 @@ phyto <- ggplot(subset(master, dummy == 'phytoplankton'), aes(x = day, y = mean,
          legend.key = element_blank(),
          text = element_text(size=17))
 phyto
-#ggsave(plot = last_plot(), file = 'zoo_phyto.png', width = 8, height = 5)
+#ggsave(plot = last_plot(), file = 'zoo_phyto_F6.png', width = 8, height = 5)
 
 zoo <- ggplot(subset(master, dummy == 'zooplankton'), aes(x = day, y = mean,group = treatment_dummy))+
  # geom_errorbar(aes(ymin = mean - se, ymax = mean + se), width = .5)+

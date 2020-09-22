@@ -5,6 +5,8 @@ library(vegan)
 library(cowplot)
 ## load data
 
+
+#### Data exploration ####
 ##import master data
 data <- read.csv2("~/Desktop/MA/MA_Rcode/project_data/master_pigments.csv", sep = ";", dec = ',')
 names(data)
@@ -56,8 +58,6 @@ ggplot(., aes(x = sampling, y = mean, col = treatment, group = treatment))+
   theme_bw()
 #ggsave(plot = last_plot(), file = 'mean_pigments.png')
 #
-
-
 pig_data%>%
   filter(sampling %in% c(0,6,10,14,18))%>%
   ggplot(aes(x = fluctuation, y = mean, fill = pigment))+
@@ -69,6 +69,8 @@ pig_data%>%
 #ggsave(plot = last_plot(), file = 'rel_pigments.png')
 
 ##################################################################################################################################
+#### overall diversity indices over time ####
+
 #approach to calculate an overall diversity index 
 data_try <- data %>%
   select(-X, -no) 
@@ -101,56 +103,86 @@ ggplot(data_try1, aes( x = fluctuation, y = mean, fill = as.factor(fluctuation))
   theme_bw()
 #ggsave(plot = last_plot(), file = 'accumulated_indices_pigments.png')
 ##################################################################################################################################
+#### diversity for relative data ####
+pigData <- data %>%
+  gather(key = 'pigments',value = 'value',-X, -no, -date,-treatment, -sampling, -planktotron )%>%
+  group_by(treatment,sampling, planktotron)%>%
+  mutate(sum = sum(value)) %>%
+  ungroup()%>%
+  spread(pigments, value ) %>%
+  mutate(rel_allo = Allo/sum)%>%
+  mutate(rel_anth = Anth/sum)%>% ###berechnung der relativen werte in neuer spalte nach Schlueter et al.
+  mutate(rel_bb.Car = bb.Car/sum)%>%
+  mutate(rel_cNeo = c.Neo/sum) %>%
+  mutate(rel_cantha = Cantha/sum)%>%
+  mutate(rel_chl.a = Chl.a/sum)%>%
+  mutate(rel_chl.b = Chl.b/sum)%>%
+  mutate(rel_chl.c1 = Chl.c1/sum)%>%
+  mutate(rel_chl.c2 = Chl.c2/sum)%>%
+  mutate(rel_diad = Diadino/sum)%>%
+  mutate(rel_diato = Dino/sum)%>%
+  mutate(rel_dino = Diato/sum)%>%
+  mutate(rel_echin = Echin/sum)%>%
+  mutate(rel_fuco = Fuco/sum)%>%
+  mutate(rel_lut = Lut/sum)%>%
+  mutate(rel_myxo = Myxo/sum)%>%
+  mutate(rel_peri = Peri/sum)%>%
+  mutate(rel_phe.a = Phe.a/sum)%>%
+  mutate(rel_viola = Viola/sum) %>%
+  mutate(rel_zea = Zea/sum)%>%
+  dplyr::select(-c("X","Allo", "Anth","bb.Car", "c.Neo", "Cantha","Chl.a","Chl.c1",
+                   "Chl.c2","Cryp","Diadino", "Diato","Dino","Echin","Lut","Myxo","Peri",       
+                   "Phe.a","Phe.b", "Viola", "Zea" , 'Fuco', 'Chl.b')) %>%
+  gather(key = 'pigment', value = 'value', -planktotron, - sampling, -treatment,-sum, -no, -date) %>%
+  mutate(fluctuation = paste(ifelse(treatment == 'control', 0, ifelse(treatment == 'Fluctuating_48', 48, ifelse(treatment == 'Fluctuating_36', 36,
+                                                                                                                ifelse(treatment == 'Fluctuating_24', 24, ifelse(treatment == 'Fluctuating_12', 12, 6)))))))
+pigData$sampling = as.numeric(pigData$sampling)
+pigData[is.na(pigData)] <-0 #make sure we don't have NAs
+
+names(pigData)
+# 1. decide which variables are active, remove character variables and turn them into row names 
+pigment_data.active <- pigData %>% 
+  ungroup()%>%
+  dplyr::select(-treatment) %>% #remove columns which are not needed anymore
+  spread(key = pigment, value = value) %>%
+  dplyr::select(-rel_bb.Car, -date, -sum, -no) #remove variable with only 0 entries
+
+pigment_data.active[is.na(pigment_data.active)] <- 0 #substitute NAs with 0
+
 
 ### calculate  diversity indices of pigment composition
-data_diversity <- data 
+diversity <- pigment_data.active 
 
 #remove NAs and exchange with 0
-data_diversity[is.na(data_diversity)] <- 0
+diversity[is.na(diversity)] <- 0
 
 ##calculate shannon diversity index
-data_diversity$shannon = diversity(data_diversity[, -c(1:6)], MARGIN = 1, index='shannon') #new column containing the calculated shannon index
-data_diversity <- select(data_diversity, X, no, planktotron, sampling,date, treatment, shannon, everything())
-data_diversity$simpson = diversity(data_diversity[, -c(1:7)], MARGIN = 1, index= 'invsimpson') #new column containing the calculated shannon index
-data_diversity <- select(data_diversity, X, no, planktotron, sampling,date, treatment, shannon, simpson, everything())
+diversity$shannon = diversity(diversity[, -c(1:4)], MARGIN = 1, index='shannon') #new column containing the calculated shannon index
+diversity <- select(diversity, planktotron, sampling,fluctuation, shannon, everything())
+diversity$simpson = diversity(diversity[, -c(1:5)], MARGIN = 1, index= 'invsimpson') #new column containing the calculated shannon index
+diversity <- select(diversity, planktotron, sampling,fluctuation, shannon, simpson, everything())
 ## calculate species richness
 
-ab_presence <- decostand(data_diversity[, -c(1:8)], method= 'pa', na.rm=T) #df giving absence/presence data using decostand function
-data_diversity$rich = apply(ab_presence, MARGIN = 1, FUN = sum) #new column containing the sum of species present per side (by row = MARGIN = 1)
+ab_presence <- decostand(diversity[, -c(1:6)], method= 'pa', na.rm=T) #df giving absence/presence data using decostand function
+diversity$rich = apply(ab_presence, MARGIN = 1, FUN = sum) #new column containing the sum of species present per side (by row = MARGIN = 1)
 
-data_diversity$evenness = data_diversity$shannon/log(data_diversity$rich)
+diversity$evenness = diversity$shannon/log(diversity$rich)
 
-#### LMM on diversity ####
-modell_dat <- data_diversity %>%
-  dplyr::select(planktotron, sampling, treatment,evenness, simpson) %>%
-  separate(treatment, into = c('mist', 'fluctuation'), '_') %>%
-  mutate(day = sampling *2,
-         dayname = as.factor(day)) %>%
-  mutate(fluctuation = as.numeric(fluctuation),
-         interval = 48/fluctuation)
-
-modell_dat$interval[is.na(modell_dat$interval)] <-0
-modell_dat$fluctuation[is.na(modell_dat$fluctuation)] <-0
-div <- lmer(evenness ~ interval*day + (1|planktotron) + (1|dayname), data=modell_dat)
-summary(div)
-anova(div)
-
+names(diversity)
 #data wrangling
-data_plot  <- data_diversity %>%
-  select(sampling, treatment,planktotron,shannon, evenness, rich, simpson) %>%
-  gather(key = 'index', value = 'value', -treatment, -sampling, -planktotron) %>%
-  dplyr::group_by(sampling, treatment, index) %>%
+data_plot  <- diversity %>%
+  select(sampling, fluctuation,planktotron,shannon, evenness, rich, simpson) %>%
+  gather(key = 'index', value = 'value', -fluctuation, -sampling, -planktotron) %>%
+  dplyr::group_by(sampling, fluctuation, index) %>%
   dplyr::summarise(mean_index = mean(value, na.rm = T),
             sd.mpg = sd(value, na.rm = T),
             n.mpg = dplyr::n()) %>%
   mutate(se_index = sd.mpg/sqrt(n.mpg),
          lower.ci.mpg = mean_index - 1.96*se_index/sqrt(n.mpg),
          upper.ci.mpg = mean_index + 1.96*se_index/sqrt(n.mpg)) %>%
-  separate(treatment, into = c('mist', 'fluctuation'), '_') %>%
   mutate(day = sampling *2) %>%
   group_by(mean_index) %>%
   mutate(width = 0.5 * n())
-  data_plot$fluctuation[is.na(data_plot$fluctuation)] <- 0
 
 #plot
 data_plot$fluctuation <- factor(as.factor(data_plot$fluctuation),levels=c("0", "48", "36", '24', '12', '6'))
@@ -198,6 +230,26 @@ even <- ggplot(subset(data_plot, index %in% c('evenness')), aes(x =day, y = mean
         text = element_text(size=17))#
 even 
 
+rich <- ggplot(subset(data_plot, index %in% c('rich')), aes(x =day, y = mean_index))+
+  geom_line(linetype = 'dashed', size = 0.5, aes(color = fluctuation))+
+  # geom_errorbar(aes(ymin = mean_index - se_index, ymax = mean_index+se_index), width = .5)+
+  geom_errorbar(aes(ymin = lower.ci.mpg, ymax = upper.ci.mpg, color = fluctuation), width = .6,position = position_dodge2(width = .6))+
+  geom_point(aes(fill = fluctuation), pch=21, size=3, col = '#000000',position = position_dodge2(width = .6))+
+  scale_fill_manual(values = c( '#000000','#0868ac','#41b6c4','#31a354','#addd8e','#fed976'))+
+  scale_color_manual(values = c( '#000000','#0868ac','#41b6c4','#31a354','#addd8e','#fed976'))+
+  labs(x = ' ', y= 'evenness of pigment diversity', fill = 'Fluctuation  \nfrequency [h]', col = 'Fluctuation  \nfrequency [h]')+
+  theme_classic()+
+  theme(panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        strip.background = element_blank(),legend.position = 'none', 
+        panel.background = element_rect(fill = NA), #loescht den Hintergrund meines Plots/ fuellt ihn mit nichts
+        #panel.grid.major.y = element_line(color='grey', linetype = 'dashed', size=0.2),
+        panel.border= element_rect(colour = "black", fill=NA, size=1),
+        strip.text = element_text(face = 'bold'),
+        legend.background = element_blank(),
+        legend.key = element_blank(),
+        text = element_text(size=17))#
+rich 
 plot_grid(even, simpson,  labels=c("(a)","(b)"),ncol = 1, label_size = 18, hjust = 0, vjust = 0.95)
 #ggsave(plot = last_plot(), file = 'pigments.png', width = 9, height = 9)
 

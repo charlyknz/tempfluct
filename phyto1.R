@@ -318,7 +318,7 @@ diversity <- shannon_BV %>%
   mutate(fluctuation = as.numeric(fluctuation),
          interval = 48/fluctuation)
 diversity$interval[!is.finite(diversity$interval)] <- 0 
-even1 <- lmer(evenness ~ interval*day + (1|MC) + (1|dayname), data=diversity)
+even1 <- lmer(no ~ interval*day + (1|MC) + (1|dayname), data=diversity)
 summary(even1)
 anova(even1)  
   

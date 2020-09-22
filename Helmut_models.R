@@ -297,6 +297,94 @@ hist(resid(bray1), ylab="frecuencia",xlab="residuales", main="")
 plot(fitted(bray1),resid(bray1),ylab="residuales")
 qqnorm(resid(bray1), main=""); 
 qqline(resid(bray1))
+############################################################################################################
+#### relative pigment diversity data ####
+
+##
+# R Skript to analyse pigment composition
+
+##import master data
+data <- read.csv2("~/Desktop/MA/MA_Rcode/project_data/master_pigments.csv", sep = ";", dec = ',')
+names(data)
+
+## data wrangling
+pigData <- data %>%
+  gather(key = 'pigments',value = 'value',-X, -no, -date,-treatment, -sampling, -planktotron )%>%
+  group_by(treatment,sampling, planktotron)%>%
+  mutate(sum = sum(value)) %>%
+  ungroup()%>%
+  spread(pigments, value ) %>%
+  mutate(rel_allo = Allo/sum)%>%
+  mutate(rel_anth = Anth/sum)%>% ###berechnung der relativen werte in neuer spalte nach Schlueter et al.
+  mutate(rel_bb.Car = bb.Car/sum)%>%
+  mutate(rel_cNeo = c.Neo/sum) %>%
+  mutate(rel_cantha = Cantha/sum)%>%
+  mutate(rel_chl.a = Chl.a/sum)%>%
+  mutate(rel_chl.b = Chl.b/sum)%>%
+  mutate(rel_chl.c1 = Chl.c1/sum)%>%
+  mutate(rel_chl.c2 = Chl.c2/sum)%>%
+  mutate(rel_diad = Diadino/sum)%>%
+  mutate(rel_diato = Dino/sum)%>%
+  mutate(rel_dino = Diato/sum)%>%
+  mutate(rel_echin = Echin/sum)%>%
+  mutate(rel_fuco = Fuco/sum)%>%
+  mutate(rel_lut = Lut/sum)%>%
+  mutate(rel_myxo = Myxo/sum)%>%
+  mutate(rel_peri = Peri/sum)%>%
+  mutate(rel_phe.a = Phe.a/sum)%>%
+  mutate(rel_viola = Viola/sum) %>%
+  mutate(rel_zea = Zea/sum)%>%
+  dplyr::select(-c("X","Allo", "Anth","bb.Car", "c.Neo", "Cantha","Chl.a","Chl.c1",
+                   "Chl.c2","Cryp","Diadino", "Diato","Dino","Echin","Lut","Myxo","Peri",       
+                   "Phe.a","Phe.b", "Viola", "Zea" , 'Fuco', 'Chl.b')) %>%
+  gather(key = 'pigment', value = 'value', -planktotron, - sampling, -treatment,-sum, -no, -date) %>%
+  mutate(fluctuation = paste(ifelse(treatment == 'control', 0, ifelse(treatment == 'Fluctuating_48', 48, ifelse(treatment == 'Fluctuating_36', 36,
+                                                                                                                ifelse(treatment == 'Fluctuating_24', 24, ifelse(treatment == 'Fluctuating_12', 12, 6)))))))
+pigData$sampling = as.numeric(pigData$sampling)
+pigData[is.na(pigData)] <-0 #make sure we don't have NAs
+
+names(pigData)
+# 1. decide which variables are active, remove character variables and turn them into row names 
+pigment_data.active <- pigData %>% 
+  ungroup()%>%
+  dplyr::select(-treatment) %>% #remove columns which are not needed anymore
+  spread(key = pigment, value = value) %>%
+  dplyr::select(-rel_bb.Car, -date, -sum, -no) #remove variable with only 0 entries
+
+pigment_data.active[is.na(pigment_data.active)] <- 0 #substitute NAs with 0
+
+
+### calculate  diversity indices of pigment composition
+diversity <- pigment_data.active 
+
+#remove NAs and exchange with 0
+diversity[is.na(diversity)] <- 0
+
+##calculate shannon diversity index
+diversity$shannon = diversity(diversity[, -c(1:4)], MARGIN = 1, index='shannon') #new column containing the calculated shannon index
+diversity <- select(diversity, planktotron, sampling,fluctuation, shannon, everything())
+diversity$simpson = diversity(diversity[, -c(1:5)], MARGIN = 1, index= 'invsimpson') #new column containing the calculated shannon index
+diversity <- select(diversity, planktotron, sampling,fluctuation, shannon, simpson, everything())
+## calculate species richness
+
+ab_presence <- decostand(diversity[, -c(1:6)], method= 'pa', na.rm=T) #df giving absence/presence data using decostand function
+diversity$rich = apply(ab_presence, MARGIN = 1, FUN = sum) #new column containing the sum of species present per side (by row = MARGIN = 1)
+
+diversity$evenness = diversity$shannon/log(diversity$rich)
+
+#### LMM on diversity ####
+modell_dat <- diversity %>%
+  dplyr::select(planktotron, sampling, fluctuation,evenness, simpson, rich) %>%
+  mutate(day = sampling *2, #add day column
+         dayname = as.factor(day)) %>%
+  mutate(fluctuation = as.numeric(fluctuation),
+         interval = 48/fluctuation) #calculate fluctuation interval in 48 h
+modell_dat$interval[is.infinite(modell_dat$interval)] <-0
+modell_dat$fluctuation[is.na(modell_dat$fluctuation)] <-0
+
+div <- lmer(rich ~ interval*day + (1|planktotron) + (1|dayname), data=modell_dat)
+summary(div)
+anova(div)
 
 ############################################################################################################
 #### Stoichiometry ####
