@@ -37,6 +37,10 @@ RUE12$fluctuation <- factor(as.factor(RUE12$fluctuation),levels=c("0", "48", "36
 names(RUE12)
 
 #### pigment diversity ####
+
+data <- read.csv2("~/Desktop/MA/MA_Rcode/project_data/master_pigments.csv", sep = ";", dec = ',')
+names(data)
+
 #### diversity for relative data ####
 pigData <- data %>%
   gather(key = 'pigments',value = 'value',-X, -no, -date,-treatment, -sampling, -planktotron )%>%
@@ -123,7 +127,7 @@ formula <- y ~ x
 RUE_div <- ggplot(subset(all_RUE_div, RUE == 'P_RUE' & index == 'evenness'), aes(x = value_div, y = value))+
   geom_point(aes(color = fluctuation), size = 3)+
   scale_color_manual(values = c( '#000000','#0868ac','#41b6c4','#31a354','#addd8e','#fed976'))+
-  labs(x = 'evenness', y = 'RUE (Total P)')+
+  labs(x = 'evenness', y = expression(RUE['P']))+
  # stat_smooth(aes(fill = fluctuation, color = fluctuation), method = "lm", se = F, size = 0.5,formula = formula) +
   stat_smooth( method = "lm", se = T, size = 0.5,formula = formula, color = 'black') +
   stat_regline_equation(formula = formula, 
@@ -138,15 +142,15 @@ RUE_div <- ggplot(subset(all_RUE_div, RUE == 'P_RUE' & index == 'evenness'), aes
          legend.key = element_blank(),
          text = element_text(size=18))
 RUE_div
-#ggsave(plot = RUE_div, file = 'RUE_P_evenness_1lm.png', width = 5, height = 4)
+#ggsave(plot = RUE_div, file = 'RUE_P_evenness_1lm.tiff', width = 5, height = 4)
 RUE_divN <- ggplot(subset(all_RUE_div, RUE == 'N_RUE' & index == 'evenness'), aes(x = value_div, y = value))+
-  geom_point(aes(color = fluctuation), size = 3)+
-  scale_color_manual(values = c( '#000000','#0868ac','#41b6c4','#31a354','#addd8e','#fed976'))+
-  labs(x = 'evenness', y = 'RUE (Total N)')+
+  geom_point(aes(fill = fluctuation), pch = 21, color = 'black',size = 3)+
+  scale_fill_manual(values = c( '#000000','#0868ac','#41b6c4','#31a354','#addd8e','#fed976'))+
+  labs(x = 'pigment evenness', y =expression(RUE['N']))+
   #stat_smooth(aes(fill = fluctuation, color = fluctuation), method = "lm", se = F, size = 0.5,formula = formula) +
-  stat_regline_equation(formula = formula, 
-                     aes(label = paste(..eq.label.., ..rr.label.., sep = "~~~")))+     
-  stat_smooth( method = "lm", se = T, size = 0.5,formula = formula, color = 'black') +
+  #stat_regline_equation(formula = formula, 
+   #                  aes(label = paste(..eq.label.., ..rr.label.., sep = "~~~")))+     
+  #stat_smooth( method = "lm", se = T, size = 0.5,formula = formula, color = 'black') +
   theme( panel.background = element_rect(fill = NA), #loescht den Hintergrund meines Plots/ fuellt ihn mit nichts
          #panel.grid.major.y = element_line(color='grey', linetype = 'dashed', size=0.2),
          panel.border= element_rect(colour = "black", fill=NA, size=1),
@@ -157,5 +161,13 @@ RUE_divN <- ggplot(subset(all_RUE_div, RUE == 'N_RUE' & index == 'evenness'), ae
          legend.key = element_blank(),
          text = element_text(size=18))
 RUE_divN
+ggsave(RUE_divN, file = 'RUE_N_diversity.tiff', width = 5, height = 4)
 plot_grid(RUE_div, RUE_divN, labels = c('(a)', '(b)', label_size = 18))
 #ggsave(plot = last_plot(), file = 'even_RUE_overall_lm.png', width = 9, height = 5)
+
+
+ggscatter(subset(all_RUE_div, RUE == 'N_RUE' & index == 'evenness'), x = "value_div", y = "value", 
+          add = "reg.line", conf.int = TRUE, 
+          cor.coef = TRUE, cor.method = "spearman", xlab = 'pigment evenness',
+          ylab = 'RUE (Total N)')
+ggsave(plot = last_plot(), 'scatter_RUE_Even_plot.png')

@@ -426,7 +426,8 @@ ratio$interval[!is.finite(ratio$interval)] <- 0
   
 
 #### Model
-CN1 <- lmer(log(CSi) ~ interval*day + (1|MC) + (1|dayname), data=ratio)
+library(lmerTest)
+CN1 <- lmer((CSi) ~ interval*day + (1|MC) + (1|dayname), data=ratio)
 summary(CN1)
 anova(CN1)
 

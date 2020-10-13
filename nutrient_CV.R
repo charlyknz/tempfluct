@@ -63,7 +63,7 @@ ggplot(nut, aes(x = days, y = mean, group = treatment))+
          legend.position  ='none',
          legend.key = element_blank(),
          text = element_text(size=18))
-#ggsave(plot = last_plot(), file = 'nutrients.png', width = 9, height = 5) 
+#ggsave(plot = last_plot(), file = 'nutrients.tiff', width = 9, height = 5) 
 
 
 ###########################################################################################
@@ -76,7 +76,7 @@ co_data <- cnp_data %>%
   ungroup()%>%
   mutate(sampling = str_remove(sample, 'S'),
          sampling = as.numeric(sampling)) %>%
-  group_by(treatment) %>%
+  group_by(treatment, sampling) %>%
   summarise(mean = mean(c_umol_l, na.rm = T),
             sd = sd(c_umol_l, na.rm = T),
             se = sd/sqrt(n()),
@@ -91,8 +91,8 @@ co_data <- cnp_data %>%
 
 co_data$fluctuation <- factor(as.factor(co_data$fluctuation),levels=c("0", "48", "36", '24', '12', '6'))
 ggplot(co_data, aes(x = fluctuation, y = CV,group = treatment, fill = as.factor(fluctuation)))+
-  geom_col()+
-  geom_errorbar(aes(ymin = lower.ci.mpg, ymax = upper.ci.mpg), color = '#404040', width = .2, size = .5)+
+  geom_point(pch = 21, size = 3)+
+  #geom_errorbar(aes(ymin = lower.ci.mpg, ymax = upper.ci.mpg), color = '#404040', width = .2, size = .5)+
   scale_fill_manual(values = c( '#000000','#0868ac','#41b6c4','#31a354','#addd8e','#fed976'))+
   labs(x = 'Fluctuation frequency [h]', y = expression(coefficient~of~variance), fill = 'Fluctuation  \nfrequency [h]')+
   theme( panel.background = element_rect(fill = NA), #loescht den Hintergrund meines Plots/ fuellt ihn mit nichts
@@ -104,7 +104,7 @@ ggplot(co_data, aes(x = fluctuation, y = CV,group = treatment, fill = as.factor(
          legend.position  ='bottom',
          legend.key = element_blank(),
          text = element_text(size=18))
-#ggsave(plot = last_plot(), file = 'CV_carbon_accumulated.png', width = 9, height = 6)
+#ggsave(plot = last_plot(), file = 'CV_carbon_accumulated.tiff', width = 9, height = 6)
 
 ##########################################################################
 #### Si and P ####
@@ -190,5 +190,5 @@ ggplot(all, aes(x= day, y = mean, group = fluctuation))+
          legend.position  ='none',
          legend.key = element_blank(),
          text = element_text(size=18))
-#ggsave(plot = last_plot(), file = 'P_nutrient.png', width = 9, height = 5)
+#ggsave(plot = last_plot(), file = 'P_nutrient.tiff', width = 9, height = 5)
   

@@ -69,39 +69,6 @@ pig_data%>%
 #ggsave(plot = last_plot(), file = 'rel_pigments.png')
 
 ##################################################################################################################################
-#### overall diversity indices over time ####
-
-#approach to calculate an overall diversity index 
-data_try <- data %>%
-  select(-X, -no) 
-#remove NAs and exchange with 0
-data_try[is.na(data_try)] <- 0
-data_try$shannon = diversity(data_try[, -c(1:4)], MARGIN = 1, index='shannon') #new column containing the calculated shannon index
-## calculate species richness
-data_try <- select(data_try, treatment, sampling, date, planktotron, shannon, everything())
-ab_presence <- decostand(data_try[, -c(1:5)], method= 'pa', na.rm=T) #df giving absence/presence data using decostand function
-data_try$richness = apply(ab_presence, MARGIN = 1, FUN = sum) #new column containing the sum of species present per side (by row = MARGIN = 1)
-
-data_try$evenness = data_try$shannon/log(data_try$richness)
-
-data_try1 <- data_try %>%
-  gather(key = 'pigment', value = 'value', -date,-planktotron,-sampling,-treatment, -shannon, -evenness, -richness) %>%
-  gather(key = 'index', value = 'values', -date,-planktotron, -sampling,-treatment, -pigment,-treatment,-value) %>%
-  group_by(treatment, index) %>%
-  summarise(mean = mean(values, na.rm = T),
-            sd = sd(values, na.rm = T),
-            se = sd/sqrt(n()))%>%
-  mutate(fluctuation = paste(ifelse(treatment == 'control', 0, ifelse(treatment == 'Fluctuating_48', 48, ifelse(treatment == 'Fluctuating_36', 36,
-                                                                                                                                            ifelse(treatment == 'Fluctuating_24', 24, ifelse(treatment == 'Fluctuating_12', 12, 6)))))))
-data_try1$fluctuation <- factor(as.factor(data_try1$fluctuation),levels=c("0", "48", "36", '24', '12', '6'))
-ggplot(data_try1, aes( x = fluctuation, y = mean, fill = as.factor(fluctuation))) +
-  geom_col()+
-  geom_errorbar(aes(ymin = mean -se, ymax = mean +se), width = .2)+
-  scale_fill_manual(values = c( '#000000','#0868ac','#41b6c4', '#31a354','#addd8e','#fed976'))+
-  labs( x = 'Fluctuation frequency (in h)', y = 'shannon H index (pigment)', fill = 'Fluctuation')+
-  facet_wrap(~index, scales = 'free_y')+
-  theme_bw()
-#ggsave(plot = last_plot(), file = 'accumulated_indices_pigments.png')
 ##################################################################################################################################
 #### diversity for relative data ####
 pigData <- data %>%
@@ -194,7 +161,7 @@ simpson <- ggplot(subset(data_plot, index %in% c('simpson')), aes(x =day, y = me
   geom_point(aes(fill = fluctuation), pch=21, size=3, col = '#000000', position = position_dodge(width = .9))+
   scale_fill_manual(values = c( '#000000','#0868ac','#41b6c4','#31a354','#addd8e','#fed976'))+
   scale_color_manual(values = c( '#000000','#0868ac','#41b6c4','#31a354','#addd8e','#fed976'))+
-  labs(x = 'Time [days]', y= 'simpson index of pigment diversity', fill = 'Fluctuation  \nfrequency [h]', col = 'Fluctuation  \nfrequency [h]')+
+  labs(x = 'Time [Days]', y= 'Simpson diversity index', fill = 'Fluctuation  \nfrequency [h]', col = 'Fluctuation  \nfrequency [h]')+
   theme_classic()+
   theme(panel.grid.major = element_blank(),
         panel.grid.minor = element_blank(),
@@ -209,14 +176,15 @@ simpson <- ggplot(subset(data_plot, index %in% c('simpson')), aes(x =day, y = me
 simpson 
 #ggsave(plot = last_plot(), file = 'pigment_simpson.png', width = 7, height = 6)
 
-even <- ggplot(subset(data_plot, index %in% c('evenness')), aes(x =day, y = mean_index))+
+even <- ggplot(subset(data_plot, index %in% c('evenness') & fluctuation %in% c(0, 48,36,24,12,6)), aes(x =day, y = mean_index))+
   geom_line(linetype = 'dashed', size = 0.5, aes(color = fluctuation))+
  # geom_errorbar(aes(ymin = mean_index - se_index, ymax = mean_index+se_index), width = .5)+
   geom_errorbar(aes(ymin = lower.ci.mpg, ymax = upper.ci.mpg, color = fluctuation), width = .6,position = position_dodge2(width = .6))+
   geom_point(aes(fill = fluctuation), pch=21, size=3, col = '#000000',position = position_dodge2(width = .6))+
   scale_fill_manual(values = c( '#000000','#0868ac','#41b6c4','#31a354','#addd8e','#fed976'))+
   scale_color_manual(values = c( '#000000','#0868ac','#41b6c4','#31a354','#addd8e','#fed976'))+
-  labs(x = ' ', y= 'evenness of pigment diversity', fill = 'Fluctuation  \nfrequency [h]', col = 'Fluctuation  \nfrequency [h]')+
+  scale_y_continuous(limits = c(0.4, 1), breaks = seq(0.5,1,0.25))+
+  labs(x = '', y= 'Evenness', fill = 'Fluctuation  \nfrequency [h]', col = 'Fluctuation  \nfrequency [h]')+
   theme_classic()+
   theme(panel.grid.major = element_blank(),
         panel.grid.minor = element_blank(),
@@ -229,6 +197,9 @@ even <- ggplot(subset(data_plot, index %in% c('evenness')), aes(x =day, y = mean
         legend.key = element_blank(),
         text = element_text(size=17))#
 even 
+#ggsave(plot = even, file = 'evenness_0483624126.png', width = 5, height = 4)
+
+
 
 rich <- ggplot(subset(data_plot, index %in% c('rich')), aes(x =day, y = mean_index))+
   geom_line(linetype = 'dashed', size = 0.5, aes(color = fluctuation))+
@@ -237,7 +208,7 @@ rich <- ggplot(subset(data_plot, index %in% c('rich')), aes(x =day, y = mean_ind
   geom_point(aes(fill = fluctuation), pch=21, size=3, col = '#000000',position = position_dodge2(width = .6))+
   scale_fill_manual(values = c( '#000000','#0868ac','#41b6c4','#31a354','#addd8e','#fed976'))+
   scale_color_manual(values = c( '#000000','#0868ac','#41b6c4','#31a354','#addd8e','#fed976'))+
-  labs(x = ' ', y= 'evenness of pigment diversity', fill = 'Fluctuation  \nfrequency [h]', col = 'Fluctuation  \nfrequency [h]')+
+  labs(x = 'Time [days]', y= 'Richness', fill = 'Fluctuation  \nfrequency [h]', col = 'Fluctuation  \nfrequency [h]')+
   theme_classic()+
   theme(panel.grid.major = element_blank(),
         panel.grid.minor = element_blank(),
@@ -250,8 +221,10 @@ rich <- ggplot(subset(data_plot, index %in% c('rich')), aes(x =day, y = mean_ind
         legend.key = element_blank(),
         text = element_text(size=17))#
 rich 
-plot_grid(even, simpson,  labels=c("(a)","(b)"),ncol = 1, label_size = 18, hjust = 0, vjust = 0.95)
-#ggsave(plot = last_plot(), file = 'pigments.png', width = 9, height = 9)
+
+#ggsave(plot = rich, file = 'richness of pigment composition.tiff', width = 5, height = 4)
+plot_grid(even, rich,  labels=c("(a)","(b)"),ncol = 1, label_size = 18, hjust = 0, vjust = 0.95)
+#ggsave(plot = last_plot(), file = 'pigments.tiff', width = 9, height = 9)
 
 #######
 
@@ -259,3 +232,87 @@ ci <- data_plot %>%
   dplyr::select(day, fluctuation, index, mean_index, lower.ci.mpg, upper.ci.mpg) %>%
   arrange(index, day)
 #write.csv2(x = ci, file = 'ci_pigments.csv')
+#####
+
+#### Eveness of species phytoplankton biomass relationship####
+data_comp  <- diversity %>%
+  select(sampling, fluctuation,planktotron,shannon, evenness, rich, simpson) %>%
+  gather(key = 'index', value = 'value', -fluctuation, -sampling, -planktotron) %>%
+  mutate(day = sampling *2,
+         fluctuation= as.numeric(fluctuation)) %>%
+  rename(MC = planktotron)
+str(data_comp)  
+
+
+#### Filter data ####
+cnp_data <- read.csv2('~/Desktop/MA/MA_Rcode/project_data/cnp_data_treatments.csv')
+str(cnp_data)
+
+#carbon accumulated
+co_data <- cnp_data %>%
+  ungroup()%>%
+  mutate(sampling = str_remove(sample, 'S'),
+         sampling = as.numeric(sampling),
+         day = sampling *2, 
+         MC = str_remove(MC, 'P'),
+         MC = as.numeric(MC)) %>%
+  mutate(fluctuation = paste(ifelse(treatment == 'control', 0, ifelse(treatment == 'Fluctuating_48', 48, ifelse(treatment == 'Fluctuating_36', 36,                                                                                                           ifelse(treatment == 'Fluctuating_24', 24, ifelse(treatment == 'Fluctuating_12', 12, 6)))))))%>%
+  ungroup() %>%
+  mutate(fluctuation = as.numeric(fluctuation)) %>%
+  dplyr::select(MC, fluctuation, day, sampling, c_umol_l)
+str(co_data)
+
+all_rich <- right_join(co_data, data_comp, by = c('sampling', 'fluctuation', 'MC', 'day')) %>%
+  dplyr::select(day, sampling,fluctuation, MC,value,index, c_umol_l ) %>%
+  drop_na(c_umol_l)
+
+formula <- y ~ x
+
+all_rich$fluctuation <- factor(as.factor(all_rich$fluctuation),levels=c("0", "48", "36", '24', '12', '6'))
+BioRich <- ggplot(subset(all_rich, index == 'rich'), aes(x = value, y = c_umol_l,group = fluctuation, fill = as.factor(fluctuation)))+
+  geom_point(pch = 21, size = 3)+
+  #geom_errorbar(aes(ymin = lower.ci.mpg, ymax = upper.ci.mpg), color = '#404040', width = .2, size = .5)+
+  #stat_smooth( method = "lm", se = T, size = 0.5,formula = formula, color = 'black') +
+  # stat_regline_equation(formula = formula, 
+  #                        aes(label = paste(..eq.label.., ..rr.label.., sep = "~~~"))) +     
+  scale_fill_manual(values = c( '#000000','#0868ac','#41b6c4','#31a354','#addd8e','#fed976'))+
+  scale_x_continuous(limits = c(5.5, 18), breaks = seq(6,18,3))+
+  labs(x = 'Pigment richness', y = '', fill = 'Fluctuation  \nfrequency [h]')+
+  theme( panel.background = element_rect(fill = NA), #loescht den Hintergrund meines Plots/ fuellt ihn mit nichts
+         #panel.grid.major.y = element_line(color='grey', linetype = 'dashed', size=0.2),
+         panel.border= element_rect(colour = "black", fill=NA, size=0.5),
+         strip.background = element_rect(color ='black', fill = 'white'),
+         strip.text = element_text(face = 'italic'),
+         legend.background = element_blank(),
+         legend.position  ='none',
+         legend.key = element_blank(),
+         text = element_text(size=17))
+BioRich
+
+BioEven <- ggplot(subset(all_rich, index == 'evenness'), aes(x = value, y = c_umol_l,group = fluctuation, fill = as.factor(fluctuation)))+
+  geom_point(pch = 21, size = 3)+
+  #geom_errorbar(aes(ymin = lower.ci.mpg, ymax = upper.ci.mpg), color = '#404040', width = .2, size = .5)+
+  #stat_smooth( method = "lm", se = T, size = 0.5,formula = formula, color = 'black') +
+  # stat_regline_equation(formula = formula, 
+  #                        aes(label = paste(..eq.label.., ..rr.label.., sep = "~~~"))) +     
+  scale_fill_manual(values = c( '#000000','#0868ac','#41b6c4','#31a354','#addd8e','#fed976'))+
+  labs(x = 'Evenness', y = expression(Phytoplankton~C~'['~mu*mol*~L^-1~']'), fill = 'Fluctuation  \nfrequency [h]')+
+  theme( panel.background = element_rect(fill = NA), #loescht den Hintergrund meines Plots/ fuellt ihn mit nichts
+         #panel.grid.major.y = element_line(color='grey', linetype = 'dashed', size=0.2),
+         panel.border= element_rect(colour = "black", fill=NA, size=0.5),
+         strip.background = element_rect(color ='black', fill = 'white'),
+         strip.text = element_text(face = 'italic'),
+         legend.background = element_blank(),
+         legend.position  ='none',
+         legend.key = element_blank(),
+         text = element_text(size=17))
+BioEven
+library(cowplot)
+plot_grid( BioEven, BioComp, labels=c("(a)","(b)", '(c)', '(d)','(e)', '(f)', '(g)'),ncol = 2, label_size = 18, hjust = 0, vjust = 0.95)
+
+ggsave(plot = last_plot(), file = 'pigdiv_turnover_biom.tiff', width = 9, height = 4)
+
+ggscatter(subset(all_rich, index == 'evenness' ), x = "value", y = "c_umol_l", 
+          add = "reg.line", conf.int = TRUE, 
+          cor.coef = TRUE, cor.method = "spearman", xlab = 'pigment richness',
+          ylab = 'Phytoplankton biomass')
