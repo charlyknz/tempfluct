@@ -1,4 +1,4 @@
-## skript to analyse zoo and phytoplankton carbond ata 
+## skript to analyse zoo and phytoplankton carbon data 
 library(tidyverse)
 library(ggpubr)
 ## zoo and phyto data in one plot
@@ -123,6 +123,7 @@ ggplot(master_all, aes( x= day, y = carb_mean, ))+
          text = element_text(size=17))
   
 #############################################################
+#plot particulate data 
 nutri <- master_data %>%
   select(MC, sampling, treatment, fluctuation, mean_POP_mg_l, mean_part_si_ug_l, mean_srp_mg_l,hand_si_mg_l) %>%
   gather(key = 'variable', value = 'value', -MC, -sampling, -treatment, -fluctuation, ) %>%

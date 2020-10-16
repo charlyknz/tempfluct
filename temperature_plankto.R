@@ -58,7 +58,7 @@ plot <- ggplot(temp, aes(x = datetime, y = actual_tempmiddle))+
          legend.key = element_blank(),
          text = element_text(size=18))
 plot
-ggsave(plot = plot, file = 'temp_curves.png', width = 15, height = 10)
+#ggsave(plot = plot, file = 'temp_curves.tiff', width = 15, height = 10)
 ## ------------------------------------------------------------------------------ ##
 ## ------------------------------------------------------------------------------ ##
 

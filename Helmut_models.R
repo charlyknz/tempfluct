@@ -13,25 +13,30 @@ library(tidyverse)
 #### Response data ####
 
 #import  data
-data <- read.csv2('~/Desktop/MA/MA_Rcode/project_data/cnp_data_treatments.csv')
+
+Mastertable_fluctron <- read_delim("~/Desktop/MA/MA_Rcode/project_data/Mastertable_fluctron.csv", 
+                                   ";", escape_double = FALSE, locale = locale(decimal_mark = ","), 
+                                   trim_ws = TRUE)
+#View(Mastertable_fluctron)
+str(Mastertable_fluctron)
+
+# use only carbon data
+data <- Mastertable_fluctron %>%
+  dplyr::select(fluctuation, sampling, planktotron, carbon_umol_l)
 names(data)
-str(data)
 #######################DATA WRANGLING############################################
 
 data1 <- data %>%
-  mutate(sampling = str_remove(sampling, 'S'),
-         sampling = as.numeric(sampling),
-         MC = str_remove(MC, 'P'),
+  rename(MC = planktotron)%>%
+  mutate(sampling = as.numeric(sampling),
          day = 2*sampling) %>%
-  mutate(fluctuation = ifelse(treatment == 'control', 0, ifelse(treatment == 'Fluctuating_12', 12, ifelse(treatment == 'Fluctuating_24', 24, ifelse(treatment == 'Fluctuating_36', 36, ifelse(treatment == 'Fluctuating_48', 48,6 )))))) %>%
-  select(-X) %>%
   mutate(dayname = as.factor(day)) %>%
   mutate(interval = 48/fluctuation)
 data1$interval[!is.finite(data1$interval)] <- 0 
 str(data1)
 
 #first look at data
-ggplot(data1, aes(x = sampling, y=c_umol_l, col = treatment, group = MC ))+
+ggplot(data1, aes(x = sampling, y=carbon_umol_l, col = fluctuation, group = MC ))+
   geom_point()+
   geom_line()+
   scale_x_continuous(limits = c(0,18), breaks = seq(0,18,2))+
@@ -39,9 +44,9 @@ ggplot(data1, aes(x = sampling, y=c_umol_l, col = treatment, group = MC ))+
   theme_classic()
 
 #look at data
-hist(data1$c_umol_l)
-qqnorm(data1$c_umol_l)
-qqline(data1$c_umol_l)
+hist(data1$carbon_umol_l)
+qqnorm(data1$carbon_umol_l)
+qqline(data1$carbon_umol_l)
 
 
 # lmer for carbon data
@@ -51,7 +56,7 @@ qqline(data1$c_umol_l)
 # Random: MC number
 #         dayname (categorical variable)
 
-mod1 <- lmer(log(c_umol_l) ~ interval*day + (1|MC) + (1|dayname), data=data1)
+mod1 <- lmer((carbon_umol_l) ~ interval*day + (1|MC) + (1|dayname), data=data1)
 summary(mod1)
 anova(mod1)
 
@@ -63,26 +68,6 @@ plot(fitted(mod1),resid(mod1),ylab="residuales")
 qqnorm(resid(mod1), main=""); 
 qqline(resid(mod1))
 
-data1$fit_InterceptOnly7 <- predict(mod1)
-
-#### plot fitted values ####
-data_plot <- data1 %>%
-  group_by(interval, treatment, sampling) %>%
-  mutate(mean = mean(c_umol_l, na.rm = T),
-         sd = sd(c_umol_l, na.rm = T),
-         se = sd/sqrt(n())) %>%
-  distinct(interval, dayname, treatment, day, MC, c_umol_l, mean, se)
-mod2 <- lmer(mean ~ interval*day + (1|MC) + (1|dayname), data=data_plot)
-data_plot$fit_InterceptOnly7 <- predict(mod2)
-
-ggplot(data_plot, aes(x = day, y=c_umol_l, col = treatment, group = MC ))+
-  geom_point()+
-  #geom_errorbar(aes(ymin = mean - se, ymax = mean + se), width = .5)+
-  geom_line(aes(y = fit_InterceptOnly7), size = 0.5)+
-  scale_x_continuous(limits = c(0,36), breaks = seq(0,36,4))+
-  scale_y_continuous(limits = c(100,300), breaks = seq(100,300,20))+
-  labs(x = 'time (in days)', y = expression('Carbon in micromol/ L'))+
-  theme_classic()
 
 ####################################################################
 #######################Zooplankton###########################
